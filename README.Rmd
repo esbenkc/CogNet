@@ -1,0 +1,43 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%",
+  dpi = 92,
+  fig.retina = 2
+)
+set.seed(1)
+# Get minimum R requirement 
+dep <- as.vector(read.dcf('DESCRIPTION')[, 'Depends'])
+rvers <- substring(dep, 7, nchar(dep)-1)
+# m <- regexpr('R *\\\\(>= \\\\d+.\\\\d+.\\\\d+\\\\)', dep)
+# rm <- regmatches(dep, m)
+# rvers <- gsub('.*(\\\\d+.\\\\d+.\\\\d+).*', '\\\\1', dep)
+# Function for TOC
+# https://gist.github.com/gadenbuie/c83e078bf8c81b035e32c3fc0cf04ee8
+```
+
+# cognet
+
+**Author:** Esben Kran & Jonathan Hvithamar Rystrøm <br/>
+
+**License:** [MIT](https://opensource.org/licenses/MIT) <br/>
+
+**Started:** March 2021 
+
+## Overview
+
+Data analysis project on a whole Cognitive Science student year before and during the entire covid-19 pandemic. 
+
+### Main functions
+
+|Function              |Description                                                        |
+|:---------------------|:------------------------------------------------------------------|
+|`na()`      |na                    |
