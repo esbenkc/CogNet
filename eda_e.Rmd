@@ -1,0 +1,52 @@
+```{r}
+pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr)
+df = read_csv("all_messages.csv")
+```
+
+```{r}
+df2 <- df %>% 
+  mutate(timestamp = lubridate::as_datetime(timestamp/1000))
+df2 <- df2 %>% filter(timestamp > as.Date("2020-03-01") & timestamp < as.Date("2020-04-01"))
+```
+
+
+```{r}
+vertices <- tibble(name=unique(c(df2$from, df2$to)))
+edges <- df2 %>% select(-X1)
+```
+
+```{r}
+graph <- tbl_graph(vertices, edges)
+```
+
+```{r}
+graph %>% 
+  activate(nodes) %>% 
+  mutate(degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE),
+         rwalk = centrality_random_walk()) %>% 
+  arrange(desc(degreein))
+```
+
+```{r}
+df3 <- df2 %>% 
+  mutate(tofrom = paste0(to, from)) %>% 
+  group_by(to, from) %>% 
+  summarise(weight = n())
+
+
+
+```
+
+
+
+```{r}
+graph %>% 
+  activate(nodes) %>%
+  tidygraph::as_tibble() %>% 
+  ggplot() +
+  aes(degreein) +
+  geom_bar() +
+  theme_minimal()
+
+```
+
