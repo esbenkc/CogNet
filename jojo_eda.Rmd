@@ -5,7 +5,7 @@ date: "11/5/2021"
 output: html_document
 ---
 ```{r}
-pacman::p_load(tidyverse, tidygraph, fastnet, lubridate)
+pacman::p_load(tidyverse, tidygraph, fastnet, lubridate, reldist)
 ```
 
 # Helper functions
@@ -33,6 +33,33 @@ entropy_per_date <- function(graph) {
   date <- get_edge_date(graph)
   tibble(date=date, entropy=entropy)
 }
+
+create_pair_key <- function(a, b) {
+  apply(cbind(a, b), 1, function(x) paste(sort(x), collapse=" "))
+}
+add_pairs <- function(graph) {
+   graph %>%
+    activate(edges) %>%
+    as_tibble() %>%
+    mutate(pair_key = create_pair_key(to, from))
+}
+
+calc_friendship_strength <- function(graph) {
+   graph %>% 
+    add_pairs %>% 
+    group_by(pair_key, date) %>% 
+    summarise(pair_weight = sum(weight))
+}
+
+
+calc_gini_per_day <- function(graph) {
+  graph %>% 
+    calc_friendship_strength %>% 
+    summarise(gini_coef = gini(pair_weight), date = first(date))
+}
+
+
+
 ```
 
 
@@ -46,6 +73,7 @@ dat <- rawdat %>%
 
 dat
 ```
+
 ```{r}
 pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extrafont, seriation, NetSwan, fastnet)
 
@@ -106,10 +134,53 @@ while(current <= end){
 
 ```
 
+## Calculating entropy
 ```{r}
-entropy_df <- dat %>% 
+graph_list <- dat %>% 
   group_split(date) %>% 
-  map(create_graph) %>% 
+  map(create_graph) 
+
+entropy_df <- graph_list %>% 
   map_dfr(entropy_per_date)
+
+
+entropy_df %>% 
+  mutate(date = as.Date(date)) %>% 
+  ggplot(aes(x=date, y=entropy)) + 
+  geom_line() + 
+  geom_vline(xintercept=as.Date("2020-03-11"), colour="red") + 
+  geom_smooth() + 
+  theme_minimal()
+```
+
+## Calculating GINI-coefficient
+```{r}
+gini_df <- graph_list %>% 
+  map_dfr(calc_gini_per_day)
+
+
+gini_df %>% 
+  mutate(date = as.Date(date)) %>% 
+  ggplot(aes(x=date, y=gini_coef)) + 
+  geom_line() + 
+  geom_vline(xintercept=as.Date("2020-03-11"), colour="red") + 
+  geom_smooth() + 
+  theme_minimal()
+```
+### The power of friendship
+```{r}
+calc_friendship_strength(test_graph)
+
+
+graph <- full_graph
+
+pair_df <- add_pairs(full_graph)
+
+pair_df %>% 
+  dplyr::group_by(pair_key, date) %>% 
+  summarise(friendship = sum(weight)) %>% 
+  mutate(date = as.Date(date)) %>% 
+  ggplot(aes(log(friendship))) +
+  geom_density()
 ```
 
