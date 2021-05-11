@@ -1,0 +1,241 @@
+---
+title: "JoJo Graph Fun"
+author: "JoJo Rystrøm"
+date: "11/5/2021"
+output: html_document
+---
+```{r}
+pacman::p_load(tidyverse, tidygraph, fastnet, lubridate, reldist)
+```
+
+# Helper functions
+```{r}
+create_graph <- function(dat) {
+  vertices <- tibble(name=unique(c(dat$from, dat$to)))
+  edges <- dat
+  
+  tbl_graph(vertices, edges, directed = F)
+}
+
+calc_entropy <- function(graph_obj) {
+  metric.degree.entropy(from.igraph(graph_obj))
+}
+
+get_edge_date <- function(g) {
+  g %>% 
+    activate(edges) %>% 
+    distinct(date) %>% 
+    pull()
+}
+
+entropy_per_date <- function(graph) {
+  entropy <- calc_entropy(graph)
+  date <- get_edge_date(graph)
+  tibble(date=date, entropy=entropy)
+}
+
+create_pair_key <- function(a, b) {
+  apply(cbind(a, b), 1, function(x) paste(sort(x), collapse=" "))
+}
+add_pairs <- function(graph) {
+   graph %>%
+    activate(edges) %>%
+    as_tibble() %>%
+    mutate(pair_key = create_pair_key(to, from))
+}
+
+calc_friendship_strength <- function(graph) {
+   graph %>% 
+    add_pairs %>% 
+    group_by(pair_key, date) %>% 
+    summarise(pair_weight = sum(weight))
+}
+
+
+calc_gini_per_day <- function(graph) {
+  graph %>% 
+    calc_friendship_strength %>% 
+    summarise(gini_coef = gini(pair_weight), date = first(date))
+}
+
+# exponentially weighted moving average (adapted from https://stackoverflow.com/a/42774577/10524429)
+ewma.filter <- function (x, ratio=0.9) {
+  c(stats::filter(x * ratio, 1 - ratio, "recursive", init = x[1]))
+}
+
+# gets only last (for summarise)
+ewma.filter.last <- function (x, ratio=0.9) {
+  ewma_vec <- ewma.filter(x, ratio)
+  ewma_vec[length(ewma_vec)]
+}
+
+add_connection_logic <- function(friendship_df) {
+  friendship_df %>% 
+      mutate(
+    previous_streak = lag(is_friend) + lag(is_friend, n = 2) + lag(is_friend, n = 3) + lag(is_friend, n = 4),
+    next_streak = is_friend + lead(is_friend) + lead(is_friend, n = 2) + lead(is_friend, n = 3),
+    friend_ratio = next_streak / previous_streak,
+    new_connection = (friend_ratio >= 3) & next_streak > 1, 
+    lost_connection = (previous_streak == 0) & !new_connection
+  ) %>% 
+    select(-c(previous_streak, next_streak, friend_ratio))
+}
+
+
+entropy_in_interval <- function(df, intervalos) {
+  df %>% 
+    filter(date %within% intervalos) %>% 
+    pull(num_new_friends) %>% 
+    ts %>% 
+    pracma::approx_entropy()
+}
+
+```
+
+
+# Loading data
+```{r}
+rawdat <- read_csv("tidy_data.csv")
+```
+
+```{r}
+pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extrafont, seriation, NetSwan, fastnet)
+
+
+## CHANGE UNIT HERE
+unit="day"
+
+first_sem <- interval(ymd("2019-09-01"), ymd("2020-01-14"))
+second_sem <- interval(ymd("2020-02-03"), ymd("2020-03-13"))
+first_lockdown <- interval(ymd("2020-03-13"), ymd("2020-06-08"))
+summerbreak <- interval(ymd("2020-06-08"), ymd("2020-06-08"))
+third_sem <- interval(ymd("2020-08-31"), ymd("2020-12-31"))
+
+dat <- rawdat %>%
+  mutate(
+    timestamp = lubridate::as_datetime(timestamp / 1000),
+    date = round_date(timestamp, unit = unit),
+    from = as.character(from),
+    to = as.character(to)
+  ) %>%
+  filter(from != to) %>%
+  mutate(pair_key = create_pair_key(from, to)) %>%
+  mutate(
+    period = case_when(
+      date %within% first_sem ~ "first_sem",
+      date %within% second_sem ~ "second_sem",
+      date %within% first_lockdown ~ "lockdown",
+      date %within% summerbreak ~ "summer",
+      date %within% third_sem ~ "third_sem",
+    )
+  )
+
+
+
+
+dat
+
+dat %>% 
+  drop_na() %>% 
+  group_by(pair_key, period) %>% 
+  summarise(weight = sum(weight)) %>% 
+  arrange(desc(weight))
+
+
+```
+
+## Calculating entropy
+```{r}
+graph_list <- dat %>% 
+  group_split(date) %>% 
+  map(create_graph) 
+
+entropy_df <- graph_list %>% 
+  map_dfr(entropy_per_date)
+
+
+entropy_df %>% 
+  mutate(date = as.Date(date)) %>% 
+  ggplot(aes(x=date, y=entropy)) + 
+  geom_line() + 
+  geom_vline(xintercept=as.Date("2020-03-11"), colour="red") + 
+  geom_smooth() + 
+  theme_minimal()
+```
+
+## Calculating GINI-coefficient
+```{r}
+gini_df <- graph_list %>% 
+  map_dfr(calc_gini_per_day)
+```
+
+### The power of friendship
+```{r}
+master_graph <- create_graph(dat)
+
+pair_df <- add_pairs(master_graph)
+
+friendship_df <- pair_df %>% 
+  dplyr::group_by(pair_key, date) %>% 
+  summarise(friendship = sum(weight)) %>% 
+  mutate(date = as.Date(date)) %>% 
+  group_by(pair_key) %>% 
+  mutate(ewma_friendship = ewma.filter(friendship, ratio=0.95), 
+         log_ewma_friend = log(ewma_friendship)) %>% 
+  ungroup() %>% 
+  mutate(is_friend = log_ewma_friend > 0.2)
+
+
+con_df <- friendship_df %>% 
+  group_by(pair_key) %>% 
+  add_connection_logic
+
+
+new_cons <- con_df %>% 
+  group_by(date) %>% 
+  summarise(num_new_friends = sum(new_connection, na.rm=T))
+
+new_cons %>% 
+  ggplot(aes(x=date, y=num_new_friends)) + 
+  geom_line() +
+  geom_vline(xintercept=as.Date("2020-03-11"), colour="red")
+
+
+
+
+
+new_cons
+
+
+
+
+new_cons %>% 
+  filter(date %within% third_sem)
+
+entropy_in_interval(new_cons, intro_interval)
+entropy_in_interval(new_cons, second_sem)
+entropy_in_interval(new_cons, first_lockdown)
+entropy_in_interval(new_cons, third_sem)
+```
+```{r}
+transitivity(master_graph, type="weighted")
+```
+
+
+
+```{r}
+con_df %>% 
+  ggplot(aes(x = log_ewma_friend)) + 
+  geom_density()
+```
+
+```{r}
+gini_df %>% 
+  mutate(date = as.Date(date)) %>% 
+  ggplot(aes(x=date, y=gini_coef)) + 
+  geom_line() + 
+  geom_vline(xintercept=as.Date("2020-03-11"), colour="red") + 
+  geom_smooth() + 
+  theme_minimal()
+```
+
