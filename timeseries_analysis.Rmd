@@ -91,44 +91,43 @@ df_mean %>%
 ```{r}
 df_mean %>% 
   ggplot() +
-  aes(date, centrality_coef) + 
+  aes(date, clustering_coef) + 
   theme_minimal() +
   annotate("rect", xmin=as.Date("2020-02-03"), 
-           xmax=as.Date("2020-06-08"), ymin=0, ymax=950, 
+           xmax=as.Date("2020-06-08"), ymin=0, ymax=1, 
            alpha=0.08, fill="black") +
   annotate("rect", xmin=as.Date("2020-08-31"), 
-           xmax=as.Date("2021-01-04"), ymin=0, ymax=950, 
+           xmax=as.Date("2021-01-04"), ymin=0, ymax=1, 
            alpha=0.08, fill="black") +
   annotate("rect", xmin=as.Date("2019-08-26"), 
-           xmax=as.Date("2020-01-14"), ymin=0, ymax=950, 
+           xmax=as.Date("2020-01-14"), ymin=0, ymax=1, 
            alpha=0.08, fill="black") +
   # geom_vline(xintercept=as.Date("2020-03-11"), color="red", size=1) +
   theme(text=element_text(family="Roboto"),
         legend.position="right",
         legend.direction="vertical") +
-  labs(title="Messages per node over time",
-       subtitle="The average messages per node per week.",
+  labs(title="Clustering coefficient over time",
+       subtitle="The transitivity clustering coefficient of the network per week.",
        x="",
-       y="Messages",
-       caption="Calculated as degree centrality") +
+       y="Clustering coefficient") +
   geom_smooth(se=F, method="gam", color="#AAAAAA", size=0.2) +
   geom_line() +
   annotate("label", x=as.Date("2020-03-24"), 
-           y=300, label="Covid-19 lockdown\nin Denmark", 
+           y=0.45, label="Covid-19 lockdown\nin Denmark", 
            hjust="left", label.r=unit(0, "lines"), 
            color="red", label.size=0.1, 
            label.padding=unit(0.3, "lines"), alpha=0.85,
            lineheight=1) + 
   annotate("rect", xmin=as.Date("2020-03-06"), 
            xmax=as.Date("2020-03-18"), 
-           ymin=200, ymax=240, fill="red") +
+           ymin=0.34, ymax=0.38, fill="red") +
   annotate("text", x=as.Date("2019-11-01"), 
-           y=900, label="1st semester") + 
+           y=0.1, label="1st semester") + 
   annotate("text", x=as.Date("2020-04-06"), 
-           y=900, label="2nd semester") + 
+           y=0.1, label="2nd semester") + 
   annotate("text", x=as.Date("2020-11-01"), 
-           y=900, label="3rd semester") +
-  scale_y_continuous(limits=c(0, 950), expand=c(0,0)) +
+           y=0.1, label="3rd semester") +
+  scale_y_continuous(limits=c(0, 1), expand=c(0,0)) +
   scale_x_date(limits=c(range(df$date)[1], range(df$date)[2]),
                expand=c(0,0),
          
