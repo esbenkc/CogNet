@@ -1,0 +1,199 @@
+```{r}
+pacman::p_load(tidyverse, brms, MASS, bnlearn)
+```
+
+```{r}
+df <- read_csv("all_node_measures.csv") %>%
+  filter(unit=="week") %>% 
+  mutate(name=as.character(name))
+
+df_mean <- df %>% 
+  group_by(date) %>% 
+  summarise(
+    date=date,
+    eigen=mean(eigenvector_centrality),
+    degree=mean(centrality_degreein),
+    pagerank=mean(pagerank),
+    hub=mean(hub_centrality),
+    clustering_coef=clustering_coef)
+
+df_mean_mo <- read_csv("all_node_measures.csv") %>% 
+  filter(unit=="month") %>% 
+  mutate(name=as.character(name)) %>% 
+  group_by(date) %>% 
+  summarise(
+    date=date,
+    eigen=mean(eigenvector_centrality),
+    degree=mean(centrality_degreein),
+    pagerank=mean(pagerank),
+    hub=mean(hub_centrality),
+    clustering_coef=clustering_coef)
+  
+```
+
+```{r}
+df %>%
+  ggplot() +
+  aes(centrality_degreein) + 
+  geom_histogram() +
+  theme_minimal()
+
+
+```
+```{r}
+df_mean %>% 
+  ggplot() +
+  aes(date, degree) + 
+  theme_minimal() +
+  annotate("rect", xmin=as.Date("2020-02-03"), 
+           xmax=as.Date("2020-06-08"), ymin=0, ymax=950, 
+           alpha=0.08, fill="black") +
+  annotate("rect", xmin=as.Date("2020-08-31"), 
+           xmax=as.Date("2021-01-04"), ymin=0, ymax=950, 
+           alpha=0.08, fill="black") +
+  annotate("rect", xmin=as.Date("2019-08-26"), 
+           xmax=as.Date("2020-01-14"), ymin=0, ymax=950, 
+           alpha=0.08, fill="black") +
+  # geom_vline(xintercept=as.Date("2020-03-11"), color="red", size=1) +
+  theme(text=element_text(family="Roboto"),
+        legend.position="right",
+        legend.direction="vertical") +
+  labs(title="Messages per node over time",
+       subtitle="The average messages per node per week.",
+       x="",
+       y="Messages",
+       caption="Calculated as degree centrality") +
+  geom_smooth(se=F, method="gam", color="#AAAAAA", size=0.2) +
+  geom_line() +
+  annotate("label", x=as.Date("2020-03-24"), 
+           y=300, label="Covid-19 lockdown\nin Denmark", 
+           hjust="left", label.r=unit(0, "lines"), 
+           color="red", label.size=0.1, 
+           label.padding=unit(0.3, "lines"), alpha=0.85,
+           lineheight=1) + 
+  annotate("rect", xmin=as.Date("2020-03-06"), 
+           xmax=as.Date("2020-03-18"), 
+           ymin=200, ymax=240, fill="red") +
+  annotate("text", x=as.Date("2019-11-01"), 
+           y=900, label="1st semester") + 
+  annotate("text", x=as.Date("2020-04-06"), 
+           y=900, label="2nd semester") + 
+  annotate("text", x=as.Date("2020-11-01"), 
+           y=900, label="3rd semester") +
+  scale_y_continuous(limits=c(0, 950), expand=c(0,0)) +
+  scale_x_date(limits=c(range(df$date)[1], range(df$date)[2]),
+               expand=c(0,0),
+         
+                     date_break="3 month", date_labels="%b %Y") +
+  coord_cartesian(clip = 'off')
+
+```
+```{r}
+df_mean %>% 
+  ggplot() +
+  aes(date, centrality_coef) + 
+  theme_minimal() +
+  annotate("rect", xmin=as.Date("2020-02-03"), 
+           xmax=as.Date("2020-06-08"), ymin=0, ymax=950, 
+           alpha=0.08, fill="black") +
+  annotate("rect", xmin=as.Date("2020-08-31"), 
+           xmax=as.Date("2021-01-04"), ymin=0, ymax=950, 
+           alpha=0.08, fill="black") +
+  annotate("rect", xmin=as.Date("2019-08-26"), 
+           xmax=as.Date("2020-01-14"), ymin=0, ymax=950, 
+           alpha=0.08, fill="black") +
+  # geom_vline(xintercept=as.Date("2020-03-11"), color="red", size=1) +
+  theme(text=element_text(family="Roboto"),
+        legend.position="right",
+        legend.direction="vertical") +
+  labs(title="Messages per node over time",
+       subtitle="The average messages per node per week.",
+       x="",
+       y="Messages",
+       caption="Calculated as degree centrality") +
+  geom_smooth(se=F, method="gam", color="#AAAAAA", size=0.2) +
+  geom_line() +
+  annotate("label", x=as.Date("2020-03-24"), 
+           y=300, label="Covid-19 lockdown\nin Denmark", 
+           hjust="left", label.r=unit(0, "lines"), 
+           color="red", label.size=0.1, 
+           label.padding=unit(0.3, "lines"), alpha=0.85,
+           lineheight=1) + 
+  annotate("rect", xmin=as.Date("2020-03-06"), 
+           xmax=as.Date("2020-03-18"), 
+           ymin=200, ymax=240, fill="red") +
+  annotate("text", x=as.Date("2019-11-01"), 
+           y=900, label="1st semester") + 
+  annotate("text", x=as.Date("2020-04-06"), 
+           y=900, label="2nd semester") + 
+  annotate("text", x=as.Date("2020-11-01"), 
+           y=900, label="3rd semester") +
+  scale_y_continuous(limits=c(0, 950), expand=c(0,0)) +
+  scale_x_date(limits=c(range(df$date)[1], range(df$date)[2]),
+               expand=c(0,0),
+         
+                     date_break="3 month", date_labels="%b %Y") +
+  coord_cartesian(clip = 'off')
+
+```
+
+
+
+## Make parameters
+```{r}
+s = c("2019-08-26","2020-01-14","2020-02-03","2020-06-08","2020-08-31", "2021-01-04") %>% as.Date()
+
+l = c("2020-03-13", "2020-06-08", "2020-08-31", "2021-01-04")
+
+df <- df %>% 
+  mutate(in_semester = if_else(
+    (date >= s[1] & date <= s[2]) | 
+    (date >= s[3] & date <= s[4]) |
+    (date >= s[5] & date <= s[6]),
+    1,
+    0
+  ),
+  in_uni_lockdown = case_when(
+    date >= l[1] & date <= l[2] ~ 1,
+    date >= l[3] & date <= l[4] ~ 0.5,
+    T ~ 0
+  )
+  )
+
+```
+
+## BRMS
+
+```{r}
+bn_df <- df %>% 
+  subset(select=c(centrality_degreein, in_uni_lockdown, in_semester))
+res <- bnlearn::hc(bn_df)
+res$arcs <- res$arcs[-which((res$arcs[,'from'] == "in_uni_lockdown" &
+                               res$arcs[,'to'] == "in_semester")),]
+plot(res)
+
+```
+
+```{r}
+m_df <- df %>% 
+  filter(date>s[3] & date<s[4])
+
+cen_f0 <- bf(
+  centrality_degreein ~ in_uni_lockdown + (1 | name) + (1 | date)
+)
+
+get_prior(
+  cen_f0,
+  m_df,
+  family=gaussian
+)
+
+cen_p0 <- c(
+  prior(normal(8, 11), class = b),
+  prior(student_t(3, 0, 203.1), class = sigma)
+)
+m_df
+
+```
+
+
