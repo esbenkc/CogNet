@@ -1,55 +1,64 @@
 pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extrafont, seriation, NetSwan, fastnet)
 
-df <-read_csv("tidy_data.csv")
 
-## CHANGE UNIT HERE
-unit="year"
-
-
-
-df <- df %>% 
-  mutate(timestamp = lubridate::as_datetime(timestamp/1000),
-         date = round_date(timestamp, unit=unit),
-         from = as.character(from),
-         to = as.character(to)) %>% 
-  filter(from!=to)
-
-start <- as.Date(range(df$timestamp)[1]) %>% round_date(unit=unit)
-end <- as.Date(range(df$timestamp)[2]) %>% round_date(unit=unit)
-
-current <- start
-
-sum_df <- tibble()
-
-while(current <= end){
-  
-  current_df <- df %>% 
-    filter(date == round_date(current, unit=unit))
-  
+#' Takes in an edges dataframe to generate vertices
+CreateGraph <- function(df) {
   vertices <- tibble(name=unique(c(df$from, df$to)))
-  edges <- current_df
+  edges <- df
   
-  graph <- tbl_graph(vertices, edges)
+  graph <- tbl_graph(vertices, edges, directed = F) %>% 
+    activate(nodes) %>% 
+    mutate(date = as.Date(unique(df$date)[1]))
   
-  
+  return(graph)
+}
+
+#' Takes in a graph and outputs a DF with the nodes' measures by that unit, defined
+#' by GetMeasures()
+NodeMeasures <- function(graph) {
   # Insert specific output measures here
   graph <- graph %>%  
     activate(nodes) %>% 
-    mutate(centrality_degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE))
+    mutate(centrality_degreein = centrality_degree(mode="all", normalized=FALSE),
+           pagerank = tidygraph::centrality_pagerank(),
+           eigenvector_centrality = tidygraph::centrality_eigen(),
+           hub_centrality = centrality_hub(),
+           subgraph = centrality_subgraph())
   
-  
+  clustering_coef <- transitivity(graph)
   
   node_data <- graph %>% 
     activate(nodes) %>% 
-    as_tibble()
+    as_tibble() %>% 
+    cbind(clustering_coef)
   
-  node_data <- node_data %>% 
-    cbind(date=rep(current %>% round_date(unit=unit), nrow(node_data)))
-  
-  sum_df <- sum_df %>% 
-    rbind(node_data)
-  
-  current <- current + duration(1, unit)
+  return(node_data)
 }
 
-sum_df %>% write_csv(paste0("node_measures_", unit, ".csv"))
+#' Takes in a unit of date (e.g. day) and a directory (e.g. tidy_data.csv) to get
+#' all node_measures defined in NodeMeasures
+GetMeasures <- function(unit, dir) {
+  print(paste("Running analysis by", unit))
+  df_data <-read_csv(dir)
+  df_data <- df_data %>% 
+    mutate(timestamp = lubridate::as_datetime(timestamp/1000),
+           date = round_date(timestamp, unit=unit),
+           from = as.character(from),
+           to = as.character(to)) %>% 
+    filter(from!=to)
+  
+  df_data <- df_data %>% 
+    group_split(date) %>% 
+    map(CreateGraph) %>% 
+    map_dfr(NodeMeasures)
+  
+  df_data %>% 
+    cbind(unit=rep(unit, nrow(df_data))) %>% 
+    return()
+}
+
+
+units = c("year", "month", "week", "day")
+
+map_dfr(units, function(x) GetMeasures(unit=x, dir="tidy_data.csv")) %>% 
+  write_csv("all_node_measures.csv")
