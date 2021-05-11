@@ -5,13 +5,13 @@ date: "11/5/2021"
 output: html_document
 ---
 ```{r}
-pacman::p_load(tidyverse, tidygraph, fastnet, lubridate, reldist)
+pacman::p_load(tidyverse, tidygraph, fastnet, lubridate, reldist, zoo)
 ```
 
 # Helper functions
 ```{r}
 create_graph <- function(dat) {
-  vertices <- tibble(name=unique(c(dat$from, dat$to)))
+  vertices <- tibble(name=sort(unique(c(dat$from, dat$to))))
   edges <- dat
   
   tbl_graph(vertices, edges, directed = F)
@@ -21,10 +21,11 @@ calc_entropy <- function(graph_obj) {
   metric.degree.entropy(from.igraph(graph_obj))
 }
 
-get_edge_date <- function(g) {
+get_edge_identifier <- function(g, id_col=date) {
   g %>% 
     activate(edges) %>% 
-    distinct(date) %>% 
+    as_tibble() %>% 
+    distinct(!!sym(id_col)) %>% 
     pull()
 }
 
@@ -69,11 +70,11 @@ ewma.filter.last <- function (x, ratio=0.9) {
   ewma_vec[length(ewma_vec)]
 }
 
-add_connection_logic <- function(friendship_df) {
+add_connection_logic <- function(friendship_df, window_size=7) {
   friendship_df %>% 
       mutate(
-    previous_streak = lag(is_friend) + lag(is_friend, n = 2) + lag(is_friend, n = 3) + lag(is_friend, n = 4),
-    next_streak = is_friend + lead(is_friend) + lead(is_friend, n = 2) + lead(is_friend, n = 3),
+    previous_streak = rollsum(is_friend, k=window_size, fill=NA, align="right"),
+    next_streak = rollsum(is_friend, k=window_size, fill=NA, align="left"),
     friend_ratio = next_streak / previous_streak,
     new_connection = (friend_ratio >= 3) & next_streak > 1, 
     lost_connection = (previous_streak == 0) & !new_connection
@@ -81,6 +82,11 @@ add_connection_logic <- function(friendship_df) {
     select(-c(previous_streak, next_streak, friend_ratio))
 }
 
+test_sum <- friendship_df %>% 
+  group_by(pair_key) %>% 
+  mutate(lag_sum = , 
+         lead_sum = , 
+         ratio = lead_sum / lag_sum)
 
 entropy_in_interval <- function(df, intervalos) {
   df %>% 
@@ -90,12 +96,26 @@ entropy_in_interval <- function(df, intervalos) {
     pracma::approx_entropy()
 }
 
+get_period <- function(graph) {
+  graph %>% 
+    activate(edges) %>% 
+    as_tibble %>% 
+    distinct(period) %>% 
+    pull
+}
+
+calc_weekly_pagerank <- function(graph) {
+  pr <- page.rank(week_graphs[[1]])$vector
+  tibble(id = names(pr), pagerank = pr, week = get_edge_identifier(graph, id_col="week"))
+}
+
 ```
 
 
 # Loading data
 ```{r}
 rawdat <- read_csv("tidy_data.csv")
+dropout_dat <- read_csv("dropout_dat.csv")
 ```
 
 ```{r}
@@ -108,7 +128,7 @@ unit="day"
 first_sem <- interval(ymd("2019-09-01"), ymd("2020-01-14"))
 second_sem <- interval(ymd("2020-02-03"), ymd("2020-03-13"))
 first_lockdown <- interval(ymd("2020-03-13"), ymd("2020-06-08"))
-summerbreak <- interval(ymd("2020-06-08"), ymd("2020-06-08"))
+summerbreak <- interval(ymd("2020-06-08"), ymd("2020-08-31"))
 third_sem <- interval(ymd("2020-08-31"), ymd("2020-12-31"))
 
 dat <- rawdat %>%
@@ -119,7 +139,7 @@ dat <- rawdat %>%
     to = as.character(to)
   ) %>%
   filter(from != to) %>%
-  mutate(pair_key = create_pair_key(from, to)) %>%
+  #mutate(pair_key = create_pair_key(from, to)) %>%
   mutate(
     period = case_when(
       date %within% first_sem ~ "first_sem",
@@ -131,17 +151,21 @@ dat <- rawdat %>%
   )
 
 
-
-
-dat
-
-dat %>% 
+sum_dat <- dat %>% 
   drop_na() %>% 
-  group_by(pair_key, period) %>% 
-  summarise(weight = sum(weight)) %>% 
-  arrange(desc(weight))
+  group_by(to, from, period) %>% 
+  summarise(weight = sum(weight)) 
+sum_dat
 
+week_dat <- dat %>% 
+  ungroup() %>% 
+  drop_na() %>% 
+  mutate(week = round_date(timestamp, unit = "week")) %>% 
+  group_by(to, from, week) %>% 
+  summarise(weight = sum(weight)) 
 
+week_dat %>% 
+  arrange(week)
 ```
 
 ## Calculating entropy
@@ -183,12 +207,24 @@ friendship_df <- pair_df %>%
   mutate(ewma_friendship = ewma.filter(friendship, ratio=0.95), 
          log_ewma_friend = log(ewma_friendship)) %>% 
   ungroup() %>% 
+  mutate(is_friend = log_ewma_friend > 0.2) 
+
+create_friendship_funk <- function(pair_df, date_col = "date") {
+  pair_df %>% 
+  dplyr::group_by(pair_key, !!sym(date_col)) %>% 
+  summarise(friendship = sum(weight)) %>% 
+  mutate(date = as.Date(!!sym(date_col))) %>% 
+  group_by(pair_key) %>% 
+  mutate(ewma_friendship = ewma.filter(friendship, ratio=0.95), 
+         log_ewma_friend = log(ewma_friendship)) %>% 
+  ungroup() %>% 
   mutate(is_friend = log_ewma_friend > 0.2)
+}
 
 
 con_df <- friendship_df %>% 
   group_by(pair_key) %>% 
-  add_connection_logic
+  add_connection_logic(window_size = 7)
 
 
 new_cons <- con_df %>% 
@@ -202,11 +238,14 @@ new_cons %>%
 
 
 
+friendship_df %>% 
+  filter(date < ymd("2021-01-01")) %>% 
+  group_by(date) %>% 
+  summarise(friend_score = mean(ewma_friendship)) %>% 
+  ggplot(aes(date, friend_score)) + 
+  geom_line()
 
-
-new_cons
-
-
+length(test_sum)
 
 
 new_cons %>% 
@@ -217,6 +256,7 @@ entropy_in_interval(new_cons, second_sem)
 entropy_in_interval(new_cons, first_lockdown)
 entropy_in_interval(new_cons, third_sem)
 ```
+
 ```{r}
 transitivity(master_graph, type="weighted")
 ```
@@ -231,11 +271,131 @@ con_df %>%
 
 ```{r}
 gini_df %>% 
-  mutate(date = as.Date(date)) %>% 
+period_graphs <- sum_dat %>%
+  ungroup() %>% 
+  group_split(period) %>% 
+  map(create_graph)
+
+period_graphs
+
+test_period <- period_graphs[[1]]
+
+test_period
+trans_first <- test_period %>% 
+  transitivity(type = "weighted")
+
+trans_stuff <- period_graphs %>% 
+  map(~transitivity(.x, type="barrat"))
+
+trans_stuff %>% 
+  map_dbl(gini)
+
+
+trans_stuff %>% 
+  map_dbl(mean)
+
+trans_stuff %>% 
+  map_dbl(sd)
+
+
+?t.test
+
+period_graphs %>% 
+  map_chr(get_period)
+period_graphs
+trans_stuff %>% mutate(date = as.Date(date)) %>% 
   ggplot(aes(x=date, y=gini_coef)) + 
   geom_line() + 
   geom_vline(xintercept=as.Date("2020-03-11"), colour="red") + 
   geom_smooth() + 
   theme_minimal()
+```
+
+### Check period stuff
+```{r}
+
+```
+
+### Pseudo-model
+```{r}
+alist(num_friends <- num_messages_ewma > threshold)
+alist(num_friends ~ PageRank + vacation + num_messages + lockdown + (1|ID))
+
+# Can be done per week
+
+```
+
+
+### Let's fckin roll!
+```{r}
+week_graphs <- week_dat %>%
+  ungroup() %>% 
+  group_split(week) %>% 
+  map(create_graph)
+
+
+pagerank_df <- week_graphs %>% 
+  map_dfr(calc_weekly_pagerank)
+
+pagerank_df
+
+msg_df <- week_dat %>%
+  group_by(from, week) %>%
+  summarise(num_msgs = sum(weight)) %>%
+  ungroup() %>%
+  mutate(vacation = !((week %within% first_sem) |
+                        (week %within% second_sem) |
+                        (week %within% first_lockdown) |  (week %within% third_sem)
+  )) %>% 
+  mutate(lockdown = week %within% first_lockdown | week %within% third_sem)
+
+msg_df
+```
+
+```{r}
+week_friends <- week_graphs %>% 
+  map_dfr(add_pairs) %>% 
+  create_friendship_funk(date_col = "week")
+
+participants <- week_graphs[[2]] %>% 
+  activate(nodes) %>% 
+  as_tibble %>% 
+  mutate(id = row_number())
+
+
+num_friends_df <- tibble()
+for (i in 1:max(participants$id)) {
+  pattern <- paste0("\\b", i, "\\b")
+  temp_df <- week_friends %>%
+    filter(str_detect(pair_key, pattern)) %>%
+    group_by(date) %>%
+    summarise(num_friends = sum(is_friend)) %>%
+    ungroup() %>%
+    mutate(id = participants$name[[i]])
+  
+  num_friends_df <- num_friends_df %>% 
+    bind_rows(temp_df)
+}
+```
+
+```{r}
+msg_df
+
+model_data <- pagerank_df %>% 
+  unite(join_id, id, week, remove=FALSE) %>% 
+  left_join(unite(msg_df, join_id, from, week)) %>% 
+  left_join(unite(num_friends_df, join_id, id, date)) %>% 
+  group_by(week) %>% 
+  fill(vacation, lockdown) %>% 
+  ungroup() %>% 
+  mutate(num_msgs = replace_na(num_msgs, 0)) %>% 
+  drop_na() %>% 
+  select(-join_id)
+  
+
+write_csv(model_data, "brms_model_data.csv")
+
+model_data %>% 
+  summarise(across(everything(), ~sum(is.na(.x))))
 ```
 
