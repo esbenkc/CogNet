@@ -29,16 +29,13 @@ while(current <= end){
   vertices <- tibble(name=unique(c(df$from, df$to)))
   edges <- current_df
   
-  graph <- tbl_graph(vertices, edges, directed = F)
+  graph <- tbl_graph(vertices, edges)
   
   
   # Insert specific output measures here
   graph <- graph %>%  
     activate(nodes) %>% 
-    mutate(centrality_degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE),
-           connectivity_impact = node_connectivity_impact(),
-           coreness = node_coreness(mode = "out"),
-           eccentricity = node_eccentricity(mode = "out"))
+    mutate(centrality_degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE))
   
   
   
