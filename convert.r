@@ -2,7 +2,11 @@ pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extra
 
 df <-read_csv("tidy_data.csv")
 
+## CHANGE UNIT HERE
 unit="week"
+
+
+
 df <- df %>% 
   mutate(timestamp = lubridate::as_datetime(timestamp/1000),
          date = round_date(timestamp, unit=unit),
@@ -28,11 +32,13 @@ while(current <= end){
   graph <- tbl_graph(vertices, edges)
   
   
-  # Insert specific output thangs here
+  # Insert specific output measures here
   graph <- graph %>%  
     activate(nodes) %>% 
     mutate(degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE)) %>% 
     arrange(desc(degreein))
+  
+  
   
   node_data <- graph %>% 
     activate(nodes) %>% 
@@ -47,4 +53,4 @@ while(current <= end){
   current <- current + duration(1, unit)
 }
 
-sum_df %>% write_csv(paste0("node_measures_", unit))
+sum_df %>% write_csv(paste0("node_measures_", unit, ".csv"))
