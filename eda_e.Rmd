@@ -1,7 +1,58 @@
 ```{r}
-pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr)
-df = read_csv("all_messages.csv")
+pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extrafont, seriation)
+font_import()
 ```
+
+```{r}
+df <-read_csv("tidy_data.csv")
+
+unit="week"
+df <- df %>% 
+  mutate(timestamp = lubridate::as_datetime(timestamp/1000),
+         date = round_date(timestamp, unit=unit),
+         from = as.character(from),
+         to = as.character(to)) %>% 
+  filter(from!=to)
+
+start <- as.Date(range(df$timestamp)[1]) %>% round_date(unit=unit)
+end <- as.Date(range(df$timestamp)[2]) %>% round_date(unit=unit)
+
+current <- start
+
+sum_df <- tibble()
+
+while(current <= end){
+  
+  current_df <- df %>% 
+    filter(date == round_date(current, unit=unit))
+  
+  vertices <- tibble(name=unique(c(df$from, df$to)))
+  edges <- current_df
+  
+  graph <- tbl_graph(vertices, edges)
+  
+  graph <- graph %>%  
+    activate(nodes) %>% 
+    mutate(degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE)) %>% 
+    arrange(desc(degreein))
+  
+  node_data <- graph %>% 
+    activate(nodes) %>% 
+    as_tibble()
+  
+  node_data <- node_data %>% 
+    cbind(date=rep(current %>% round_date(unit=unit), nrow(node_data)))
+  
+  sum_df <- sum_df %>% 
+    rbind(node_data)
+  
+  current <- current + duration(1, unit)
+}
+
+sum_df
+
+```
+
 
 ```{r}
 df2 <- df %>% 
@@ -20,7 +71,7 @@ graph <- tbl_graph(vertices, edges)
 ```
 
 ```{r}
-graph %>% 
+graph <- graph %>%  
   activate(nodes) %>% 
   mutate(degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE),
          rwalk = centrality_random_walk()) %>% 
@@ -32,21 +83,80 @@ df3 <- df2 %>%
   mutate(tofrom = paste0(to, from)) %>% 
   group_by(to, from) %>% 
   summarise(weight = n())
+```
 
-
+```{r fig.height=5, fig.width=6}
+df3 %>% 
+  as_tbl_graph() %>% 
+  activate(nodes) %>% 
+  mutate(degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE),
+         rwalk = centrality_random_walk(),
+         pagerank = centrality_pagerank(),
+         cluster = tidygraph::node_rank_quadratic(),
+         community = as.factor(group_leading_eigen())) %>% 
+  arrange(desc(degreein)) %>% 
+   ggraph(layout ="gem") +
+    geom_edge_link(aes(alpha=weight)) +
+    geom_node_point(aes(size=pagerank)) +
+  labs(title="Users connected by message amount", 
+       subtitle="Between 1st of March and April 2020. The lockdown happened\non the 11th of March.",
+       size="Pagerank",
+       edge_alpha="Messages") +
+  ggraph::theme_graph() +
+  theme(text=element_text(family="Roboto"),
+        plot.title=element_text(family="Roboto",
+                                margin=margin(0,0,5,0)),
+        plot.subtitle=element_text(family="Roboto",
+                                   margin=margin(0)),
+        legend.position="right",
+        legend.direction="vertical")
 
 ```
 
-
+```{r fig.width=6, fig.height=6}
+df3 %>% 
+  as_tbl_graph() %>% 
+  activate(nodes) %>% 
+  mutate(degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE),
+         rwalk = centrality_random_walk(),
+         pagerank = centrality_pagerank(),
+         cluster = tidygraph::node_rank_quadratic(),
+         community = as.factor(group_leading_eigen())) %>% 
+  arrange(desc(degreein)) %>% 
+   ggraph(layout ="gem") +
+    geom_edge_link(aes(alpha=weight)) +
+    geom_node_point(aes(size=pagerank, color=community)) +
+  labs(title="Users connected by message amount", 
+       subtitle="Between 1st of March and April 2020. The lockdown happened\non the 11th of March.",
+       size="Pagerank",
+       edge_alpha="Messages") +
+  ggraph::theme_graph() +
+  theme(text=element_text(family="Roboto"),
+        plot.title=element_text(family="Roboto",
+                                margin=margin(0,0,5,0)),
+        plot.subtitle=element_text(family="Roboto",
+                                   margin=margin(0)),
+        legend.position="bottom",
+        legend.direction="vertical")
+```
 
 ```{r}
-graph %>% 
-  activate(nodes) %>%
-  tidygraph::as_tibble() %>% 
-  ggplot() +
-  aes(degreein) +
-  geom_bar() +
-  theme_minimal()
+graph <- df3 %>% 
+  as_tbl_graph(directed=FALSE) %>% 
+  activate(nodes) %>% 
+  mutate(degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE),
+         rwalk = centrality_random_walk(),
+         pagerank = centrality_pagerank(),
+         cluster = tidygraph::node_rank_quadratic(),
+         community = as.factor(group_edge_betweenness()))
+
+igraph::cluster_edge_betweenness(graph) %>% plot(graph, vertex.label=NA)
+
+```
+
+```{r}
+
+
 
 ```
 
