@@ -26,27 +26,29 @@ NodeMeasures <- function(graph) {
            subgraph = centrality_subgraph())
   
   clustering_coef <- transitivity(graph)
+  scaled_shannon_entropy <- diversity(graph)
+  density <- igraph::edge_density(graph)
   
   node_data <- graph %>% 
     activate(nodes) %>% 
     as_tibble() %>% 
-    cbind(clustering_coef)
+    cbind(clustering_coef) %>% 
+    cbind(scaled_shannon_entropy) %>% 
+    cbind(density)
   
   return(node_data)
 }
 
 #' Takes in a unit of date (e.g. day) and a directory (e.g. tidy_data.csv) to get
 #' all node_measures defined in NodeMeasures
-GetMeasures <- function(unit, dir) {
+GetMeasures <- function(unit, df_data) {
   print(paste("Running analysis by", unit))
-  df_data <-read_csv(dir)
   df_data <- df_data %>% 
     mutate(timestamp = lubridate::as_datetime(timestamp/1000),
            date = round_date(timestamp, unit=unit),
            from = as.character(from),
            to = as.character(to)) %>% 
     filter(from!=to)
-  
   df_data <- df_data %>% 
     group_split(date) %>% 
     map(CreateGraph) %>% 
@@ -60,5 +62,9 @@ GetMeasures <- function(unit, dir) {
 
 units = c("year", "month", "week", "day")
 
-map_dfr(units, function(x) GetMeasures(unit=x, dir="tidy_data.csv")) %>% 
+df <-read_csv("tidy_data.csv")
+
+map_dfr(units, function(x) GetMeasures(unit=x, df)) %>% 
   write_csv("all_node_measures.csv")
+
+
