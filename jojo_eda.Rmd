@@ -1,0 +1,115 @@
+---
+title: "JoJo Graph Fun"
+author: "JoJo Rystrøm"
+date: "11/5/2021"
+output: html_document
+---
+```{r}
+pacman::p_load(tidyverse, tidygraph, fastnet, lubridate)
+```
+
+# Helper functions
+```{r}
+create_graph <- function(dat) {
+  vertices <- tibble(name=unique(c(dat$from, dat$to)))
+  edges <- dat
+  
+  tbl_graph(vertices, edges, directed = F)
+}
+
+calc_entropy <- function(graph_obj) {
+  metric.degree.entropy(from.igraph(graph_obj))
+}
+
+get_edge_date <- function(g) {
+  g %>% 
+    activate(edges) %>% 
+    distinct(date) %>% 
+    pull()
+}
+
+entropy_per_date <- function(graph) {
+  entropy <- calc_entropy(graph)
+  date <- get_edge_date(graph)
+  tibble(date=date, entropy=entropy)
+}
+```
+
+
+# Loading data
+```{r}
+rawdat <- read_csv("tidy_data.csv")
+
+dat <- rawdat %>% 
+  filter(from != to) %>% 
+  mutate(datetime = lubridate::as_datetime(timestamp/1000))
+
+dat
+```
+```{r}
+pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extrafont, seriation, NetSwan, fastnet)
+
+
+## CHANGE UNIT HERE
+unit="week"
+
+
+
+dat <- rawdat %>% 
+  mutate(timestamp = lubridate::as_datetime(timestamp/1000),
+         date = round_date(timestamp, unit=unit),
+         from = as.character(from),
+         to = as.character(to)) %>% 
+  filter(from!=to)
+
+start <- as.Date(range(dat$timestamp)[1]) %>% round_date(unit=unit)
+end <- as.Date(range(dat$timestamp)[2]) %>% round_date(unit=unit)
+
+current <- start
+
+sum_dat <- tibble()
+
+while(current <= end){
+  
+  current_dat <- dat %>% 
+    filter(date == round_date(current, unit=unit))
+  
+  vertices <- tibble(name=unique(c(dat$from, dat$to)))
+  edges <- current_dat
+  
+  graph <- tbl_graph(vertices, edges, directed = F)
+  
+  
+  # Insert specific output measures here
+  graph <- graph %>%  
+    activate(nodes) %>% 
+    mutate(centrality_degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE),
+           connectivity_impact = node_connectivity_impact(),
+           coreness = node_coreness(mode = "out"),
+           eccentricity = node_eccentricity(mode = "out"))
+  
+  
+  node_data <- graph %>% 
+    activate(nodes) %>% 
+    as_tibble()
+  
+  node_data <- node_data %>% 
+    cbind(date=rep(current %>% round_date(unit=unit), nrow(node_data)))
+  
+  sum_dat <- sum_dat %>% 
+    rbind(node_data)
+  
+  current <- current + duration(1, unit)
+}
+
+#sum_dat %>% write_csv(paste0("node_measures_", unit, ".csv"))
+
+```
+
+```{r}
+entropy_df <- dat %>% 
+  group_split(date) %>% 
+  map(create_graph) %>% 
+  map_dfr(entropy_per_date)
+```
+
