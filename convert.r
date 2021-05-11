@@ -1,9 +1,9 @@
-pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extrafont, seriation)
+pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extrafont, seriation, NetSwan, fastnet)
 
 df <-read_csv("tidy_data.csv")
 
 ## CHANGE UNIT HERE
-unit="week"
+unit="year"
 
 
 
@@ -29,14 +29,16 @@ while(current <= end){
   vertices <- tibble(name=unique(c(df$from, df$to)))
   edges <- current_df
   
-  graph <- tbl_graph(vertices, edges)
+  graph <- tbl_graph(vertices, edges, directed = F)
   
   
   # Insert specific output measures here
   graph <- graph %>%  
     activate(nodes) %>% 
-    mutate(degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE)) %>% 
-    arrange(desc(degreein))
+    mutate(centrality_degreein = centrality_degree(weights=NULL, mode="in", loops=FALSE, normalized=FALSE),
+           connectivity_impact = node_connectivity_impact(),
+           coreness = node_coreness(mode = "out"),
+           eccentricity = node_eccentricity(mode = "out"))
   
   
   

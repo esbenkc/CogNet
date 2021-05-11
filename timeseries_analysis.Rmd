@@ -1,0 +1,18 @@
+```{r}
+pacman::p_load(tidyverse, brms)
+```
+
+```{r}
+df <- read_csv("node_measures_week.csv") %>% 
+  mutate(name=as.character(name))
+```
+
+```{r}
+df %>% 
+  ggplot() +
+  aes(date, coreness) %>% 
+  geom_line() +
+  theme_minimal()
+
+```
+
