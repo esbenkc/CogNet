@@ -1,8 +1,42 @@
-```{r}
-pacman::p_load(tidyverse, brms, MASS, bnlearn, lubridate)
+```{r include=F, echo=F}
+pacman::p_load(tidyverse, brms, MASS, bnlearn, lubridate, extrafont)
+pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extrafont, seriation, NetSwan, fastnet)
+extrafont::loadfonts()
 ```
 
 ```{r}
+
+#' Takes in a graph and outputs a DF with the nodes' measures by that unit, defined
+#' by GetMeasures()
+NodeMeasures <- function(graph) {
+  # Insert specific output measures here
+  graph <- graph %>%  
+    activate(nodes) %>% 
+    mutate(centrality_degreein = centrality_degree(mode="all", normalized=FALSE),
+           pagerank = tidygraph::centrality_pagerank(),
+           eigenvector_centrality = tidygraph::centrality_eigen(),
+           hub_centrality = centrality_hub(),
+           subgraph = centrality_subgraph())
+  
+  clustering_coef <- transitivity(graph)
+  scaled_shannon_entropy <- diversity(graph)
+  density <- igraph::edge_density(graph)
+  
+  node_data <- graph %>% 
+    activate(nodes) %>% 
+    as_tibble() %>% 
+    cbind(clustering_coef) %>% 
+    cbind(scaled_shannon_entropy) %>% 
+    cbind(density)
+  
+  return(node_data)
+}
+
+```
+
+
+
+```{r include=F, echo=F}
 df <- read_csv("all_node_measures.csv") %>%
   filter(unit=="week") %>% 
   mutate(name=as.character(name))
@@ -34,15 +68,6 @@ df_mean_mo <- read_csv("all_node_measures.csv") %>%
   
 ```
 
-```{r}
-df %>%
-  ggplot() +
-  aes(centrality_degreein) + 
-  geom_histogram() +
-  theme_minimal()
-
-
-```
 ```{r}
 df_mean %>% 
   ggplot() +
@@ -105,7 +130,6 @@ df_mean %>%
   annotate("rect", xmin=as.Date("2019-08-26"), 
            xmax=as.Date("2020-01-14"), ymin=0, ymax=1, 
            alpha=0.08, fill="black") +
-  # geom_vline(xintercept=as.Date("2020-03-11"), color="red", size=1) +
   theme(text=element_text(family="Roboto"),
         legend.position="right",
         legend.direction="vertical") +
@@ -133,63 +157,10 @@ df_mean %>%
   scale_y_continuous(limits=c(0, 1), expand=c(0,0)) +
   scale_x_date(limits=c(range(df$date)[1], range(df$date)[2]),
                expand=c(0,0),
-         
                      date_break="3 month", date_labels="%b %Y") +
   coord_cartesian(clip = 'off')
 
 ```
-
-## Entropy
-```{r}
-
-df_mean_mo %>% 
-  ggplot() +
-  aes(date, entropy) + 
-  theme_minimal() +
-  annotate("rect", xmin=as.Date("2020-02-03"), 
-           xmax=as.Date("2020-06-08"), ymin=0, ymax=1, 
-           alpha=0.08, fill="black") +
-  annotate("rect", xmin=as.Date("2020-08-31"), 
-           xmax=as.Date("2021-01-04"), ymin=0, ymax=1, 
-           alpha=0.08, fill="black") +
-  annotate("rect", xmin=as.Date("2019-08-26"), 
-           xmax=as.Date("2020-01-14"), ymin=0, ymax=1, 
-           alpha=0.08, fill="black") +
-  # geom_vline(xintercept=as.Date("2020-03-11"), color="red", size=1) +
-  theme(text=element_text(family="Roboto"),
-        legend.position="right",
-        legend.direction="vertical") +
-  labs(title="Scaled Shannon Entropy",
-       subtitle="The transitivity clustering coefficient of the network per week.",
-       x="",
-       y="Clustering coefficient") +
-  geom_smooth(se=F, method="gam", color="#AAAAAA", size=0.2) +
-  geom_line() +
-  annotate("label", x=as.Date("2020-03-24"), 
-           y=0.45, label="Covid-19 lockdown\nin Denmark", 
-           hjust="left", label.r=unit(0, "lines"), 
-           color="red", label.size=0.1, 
-           label.padding=unit(0.3, "lines"), alpha=0.85,
-           lineheight=1) + 
-  annotate("rect", xmin=as.Date("2020-03-06"), 
-           xmax=as.Date("2020-03-18"), 
-           ymin=0.34, ymax=0.38, fill="red") +
-  annotate("text", x=as.Date("2019-11-01"), 
-           y=0.1, label="1st semester") + 
-  annotate("text", x=as.Date("2020-04-06"), 
-           y=0.1, label="2nd semester") + 
-  annotate("text", x=as.Date("2020-11-01"), 
-           y=0.1, label="3rd semester") +
-  scale_y_continuous(limits=c(0.9, 1.1), expand=c(0,0)) +
-  scale_x_date(limits=c(range(df$date)[1], range(df$date)[2]),
-               expand=c(0,0),
-         
-                     date_break="3 month", date_labels="%b %Y") +
-  coord_cartesian(clip = 'off')
-```
-
-
-
 ## Make parameters
 ```{r}
 s = c("2019-08-26","2020-01-14","2020-02-03","2020-06-08","2020-08-31", "2021-01-04") %>% as.Date()
@@ -390,6 +361,53 @@ sum_df %>%
 ```
 
 
+```{r}
+node_df <- read_csv("all_node_measures.csv")
+
+node_df %>%
+  filter(unit=="week") %>% 
+  ggplot() +
+  aes(date, centrality_degreein, color=name) +
+  annotate("rect", xmin=as.Date("2020-02-03"), 
+           xmax=as.Date("2020-06-08"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2020-08-31"), 
+           xmax=as.Date("2021-01-04"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2019-08-26"), 
+           xmax=as.Date("2020-01-14"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("text", x=as.Date("2019-11-01"), 
+           y=95, label="1st semester") + 
+  annotate("text", x=as.Date("2020-04-06"), 
+           y=95, label="2nd semester") + 
+  annotate("text", x=as.Date("2020-11-01"), 
+           y=95, label="3rd semester") +
+  geom_jitter(alpha=0.2, size=0.5, width=30) +
+  geom_smooth(se=F, size=0.2, method="gam") +
+  geom_smooth(aes(date, centrality_degreein, color=NA), 
+              se=F, size=1.3, color="black", method="gam") +
+  geom_vline(xintercept=as.Date("2020-03-13"), 
+             color="black", size=1, linetype="dashed") +
+  theme_minimal() +
+  theme(legend.position="none") +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-03-20"), 
+           hjust="left", color="black", y=75, 
+           label="Covid-19 lockdown\nin Denmark", 
+           lineheight=0.9) +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-12-03"), 
+           y=25, label="Averaged\nmodel", 
+           hjust="left", lineheight=0.9) +
+  coord_cartesian(ylim=c(0,700), clip="off", 
+                  expand=F) +
+  labs(title="Messages sent by person",
+       subtitle="With individual and averaged trends represented by smoothed lines.")
+
+```
+
+
 ## Cognitive models
 ```{r}
 # What is the chance that I'll respond to a message and what's the time distribution of response?
@@ -411,7 +429,7 @@ cog_df <- raw_df %>%
          weight=weight,
          key=paste(from, to),
          rev_key=paste(to, from),
-         is_answer=if_else(lag(rev_key) == key, 1, 0)) %>% 
+         is_answer=if_else(lag(rev_key) == key, 1, NA_real_)) %>% 
   group_by(key) %>% 
   arrange(timestamp) %>% 
   mutate(messages_with=cumsum(weight)-weight) %>% 
@@ -420,9 +438,9 @@ cog_df <- raw_df %>%
     last_infection = if_else(lag(is_answer) == 1, lag(timestamp), NA_Date_)
   ) %>% 
   fill(last_infection)
-  
 
 cog_df
+
 ```
 
 
