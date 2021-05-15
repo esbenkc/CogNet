@@ -18,10 +18,6 @@ import pandas as pd
 from zipfile import ZipFile
 from collections import Counter
 from pathlib import Path
-
-
-
-
 # In[18]:
 
 
@@ -225,7 +221,7 @@ def anonymize_folder(data_folder):
 def find_unique_ids(cogscis, full_df):
     """ Returns unique ids (groups and people) for filtering"""
     unique_people = pd.Series(cogscis).unique()
-    unique_groups = unique_master.loc[unique_master["rel_type"] == "group", "to"].unique()
+    unique_groups = full_df.loc[full_df["rel_type"] == "group", "to"].unique()
     return set(np.concatenate((unique_people, unique_groups)))
 
 
@@ -285,10 +281,12 @@ def fix_vero(df):
     """ Fixes weird vero bug """
     df.loc[df["from"] == "Verus Juhasz", "from"] = hash_name("Verus Juhasz")
     df.loc[df["to"] == "Verus Juhasz", "to"] = hash_name("Verus Juhasz")
-    
+
+
 def calculate_group_weights(group_sizes):
     """ add weights to the convo depending on size """
-    return np.floor(np.log2(group_sizes.max()) * (1 / np.log2(group_sizes)))
+    return 1 / (group_sizes-1)
+
 
 def create_random_ids(id_tuple):
     """Inputs a tuple of pd.Series with ids and outputs a dict mapping them to new randomly generated ids"""
@@ -403,8 +401,8 @@ fix_vero(unique_master)
 
 cog_df = remove_non_cogs(unique_master)
 cog_df.to_csv(Path("../cog_raw.csv"), index=False)
+cog_df = pd.read_csv(Path("../cog_raw.csv"))
 consent_df = filter_consent(cog_df, dropout_df["name"])
-#consent_df.to_csv("raw_consensual.csv", index=False)
 
 
 # In[8]:
@@ -413,7 +411,7 @@ consent_df = filter_consent(cog_df, dropout_df["name"])
 random_replacement_dict = create_random_ids((consent_df["from"], consent_df["to"], dropout_df["name"]))
 consent_df.replace(random_replacement_dict, inplace=True)
 dropout_df.replace(random_replacement_dict, inplace=True)
-dropout_df.to_csv("dropout_dat.csv", inplace=True)
+dropout_df.to_csv("dropout_dat.csv", index=False)
 
 # In[10]:
 
