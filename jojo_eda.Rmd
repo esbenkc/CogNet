@@ -82,11 +82,6 @@ add_connection_logic <- function(friendship_df, window_size=7) {
     select(-c(previous_streak, next_streak, friend_ratio))
 }
 
-test_sum <- friendship_df %>% 
-  group_by(pair_key) %>% 
-  mutate(lag_sum = , 
-         lead_sum = , 
-         ratio = lead_sum / lag_sum)
 
 entropy_in_interval <- function(df, intervalos) {
   df %>% 
@@ -399,3 +394,7 @@ model_data %>%
   summarise(across(everything(), ~sum(is.na(.x))))
 ```
 
+Funk som man kunne tilføje
+- temporale dynamikker i netværket (e.g. avg. response time)
+  - avg. response time
+- interaktioner?     
