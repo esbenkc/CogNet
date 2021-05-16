@@ -1,0 +1,63 @@
+---
+title: "Soccult anal"
+author: "JoJo Rystrøm"
+date: "16/5/2021"
+output: html_document
+---
+
+## Loading libries
+```{r}
+pacman::p_load(tidyverse, brms)
+```
+
+```{r}
+rawdat <- read_csv("brms_model_data.csv")
+```
+```{r}
+dat %>% 
+  ggplot(aes(x=log(new_cons))) + 
+  geom_histogram()
+```
+
+```{r}
+dat <- rawdat %>% 
+  mutate(timecol = as.integer(as.factor(week)))
+
+dat %>% 
+  filter(new_cons > 0 ) %>% 
+  summarise(mean(log(new_cons)), sd(log(new_cons)))
+
+m0_f <- bf(new_cons ~ 0 + lockdown*pagerank + (1 | id))
+
+get_prior(m0_f, data=dat, family=zero_inflated_poisson())
+
+
+
+
+m0_priors <- c(
+  prior(normal(0.32, 0.1), class=b), 
+  prior(normal(0.5, 0.1), class=sd), 
+  prior(beta(1, 1), class=zi)
+)
+ 
+m0_prior_model <- brm(
+  m0_f,
+  dat,
+  family=zero_inflated_poisson(),
+  prior=m0_priors,
+  sample_prior = "only",
+  cores = 2,
+  chains = 2,
+  backend = "cmdstanr", 
+  control = list(adapt_delta = 0.99))
+
+pp_check(m0_prior_model, nsamples=100)
+
+m0_testy <- update(m0_prior_model, sample_prior=T)
+pp_check(m0_testy, nsamples=100)
+
+summary(m0_testy)
+hypothesis(m0_testy, "lockdownTRUE < lockdownFALSE")
+hypothesis(m0_testy, "abs(lockdownTRUE:pagerank) > 0")
+```
+
