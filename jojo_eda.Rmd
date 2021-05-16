@@ -342,7 +342,6 @@ week_graphs <- week_dat %>%
 pagerank_df <- week_graphs %>% 
   map_dfr(calc_weekly_pagerank)
 
-pagerank_df
 
 msg_df <- week_dat %>%
   group_by(from, week) %>%
@@ -403,6 +402,40 @@ model_data %>%
   summarise(across(everything(), ~sum(is.na(.x))))
 ```
 
+```{r}
+msg_summary <- dat %>% 
+  group_by(from, to, date) %>% 
+  summarise(num_msgs = sum(weight), 
+            log_msgs = log(num_msgs)) 
+
+plot_data <- msg_summary %>% 
+  filter(from=="235")
+
+
+
+plot_data %>% 
+  ggplot(aes(x = log_msgs, colour = from)) + 
+  geom_density() + 
+  geom_vline(xintercept = mean(plot_data$log_msgs))
+
+test_cluster <- kmeans(plot_data$log_msgs, centers=2)
+
+get_clusters <- function(x, num_clusters=2) {
+  as.factor(kmeans(x, centers=num_clusters)$cluster)
+}
+
+clusters <- get_clusters(plot_data$log_msgs)
+
+msg_summary %>% 
+  group_by(from) %>% 
+  mutate(cluster = get_clusters(log_msgs)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = log_msgs, fill = cluster)) + 
+  geom_histogram() + 
+  facet_wrap(~from)
+
+
+```
 
 Funk som man kunne tilføje
 - temporale dynamikker i netværket (e.g. avg. response time)
