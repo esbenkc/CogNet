@@ -108,11 +108,11 @@ entropy_in_interval <- function(df, intervalos) {
     pracma::approx_entropy()
 }
 
-get_period <- function(graph) {
+get_period <- function(graph, period="period") {
   graph %>% 
     activate(edges) %>% 
     as_tibble %>% 
-    distinct(period) %>% 
+    distinct(!!sym(period)) %>% 
     pull
 }
 
@@ -149,6 +149,21 @@ create_friendship_funk <- function(pair_df, date_col = "date") {
   ungroup() %>% 
   mutate(is_friend = log_ewma_friend > 0.2)
 }
+
+get_participants <- function(g) {
+  g %>% 
+    activate(nodes) %>% 
+    as_tibble %>% 
+    mutate(id = row_number())
+}
+
+# Calculates local, weighted transitivy and returns in a dataframe
+calc_local_transitivity <- function(g) {
+  tibble(trans = transitivity(g, type="weighted")) %>% 
+    mutate(id = row_number(), 
+           week = get_period(g, period="week"))
+}
+
 ```
 
 
@@ -191,11 +206,6 @@ dat <- rawdat %>%
   )
 
 
-sum_dat <- dat %>% 
-  drop_na() %>% 
-  group_by(to, from, period) %>% 
-  summarise(weight = sum(weight)) 
-sum_dat
 
 week_dat <- dat %>% 
   ungroup() %>% 
@@ -375,7 +385,6 @@ msg_df <- week_dat %>%
   )) %>% 
   mutate(lockdown = week %within% first_lockdown | week %within% third_sem)
 
-msg_df
 ```
 
 ```{r}
@@ -387,6 +396,7 @@ participants <- week_graphs[[2]] %>%
   activate(nodes) %>% 
   as_tibble %>% 
   mutate(id = row_number())
+
 
 
 num_friends_df <- tibble()
@@ -430,19 +440,6 @@ msg_summary <- week_dat %>%
   summarise(num_msgs = sum(weight), 
             log_msgs = log(num_msgs)) 
 
-plot_data <- msg_summary %>% 
-  filter(from=="235")
-
-
-
-plot_data %>% 
-  ggplot(aes(x = log_msgs, colour = from)) + 
-  geom_density() + 
-  geom_vline(xintercept = mean(plot_data$log_msgs))
-
-
-
-
 msg_summary <- msg_summary %>% 
   group_by(from) %>% 
   mutate(cluster = get_clusters(log_msgs)) %>% 
@@ -474,11 +471,24 @@ new_con_df %>%
   ggplot(aes(x = week, y=mean_new_con)) + 
   geom_line()
 
-model_data %>% 
+model_data <- model_data %>% 
   unite(join_id, id, week, remove=FALSE) %>% 
   left_join(unite(new_con_df, join_id, id, week)) %>%  
-  mutate(new_cons = replace_na(new_cons, 0)) %>% 
-  select(-join_id) %>% 
+  mutate(new_cons = replace_na(new_cons, 0))
+```
+### Adding transitivity / centrality
+```{r}
+
+
+trans_df <- week_graphs %>% 
+  map_dfr(calc_local_transitivity) %>% 
+  left_join(get_participants(week_graphs[[1]]), by="id") %>% 
+  select(-id) %>% 
+  rename(id=name) %>% 
+  unite(join_id, id, week)
+
+model_data %>% 
+  left_join(trans_df) %>% 
   write_csv("brms_model_data.csv")
 ```
 
