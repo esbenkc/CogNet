@@ -301,14 +301,14 @@ def repeat_data(weighted_data, weight_col="weight"):
 
 def group_weight_pipe(df):
     """ Creates a df with index of group ids and a column with msg weights + series with group sizes"""
-    group_sizes = calc_group_sizes(consent_df)
-    return pd.DataFrame(group_sizes).assign(weight = calculate_group_weights(group_sizes))["weight"], group_sizes
+    group_sizes = calc_group_sizes(df)
+    return pd.DataFrame(group_sizes).assign(weight=calculate_group_weights(group_sizes))["weight"], group_sizes
 
 def add_group_weights(df):
     """ calculates and joins the group weights to the original dataframe """
     group_weights, group_sizes = group_weight_pipe(df)
     merged_msgs = pd.merge(df, group_weights, how="left", left_on="to", right_index=True)
-    merged_msgs["weight"] = merged_msgs["weight"].fillna(np.floor(np.log2(group_sizes.max())))
+    merged_msgs["weight"] = merged_msgs["weight"].fillna(1)
     return merged_msgs
 
 def merge_group_members(df, weighted_group):
@@ -423,8 +423,6 @@ consent_df.to_csv("raw_consensual.csv", index=False)
 
 
 consent_df = pd.read_csv("raw_consensual.csv")
-
-
 # In[36]:
 
 

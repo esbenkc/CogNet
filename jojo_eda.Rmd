@@ -70,11 +70,28 @@ ewma.filter.last <- function (x, ratio=0.9) {
   ewma_vec[length(ewma_vec)]
 }
 
+add_streaks <- function(friendship_df, window_size = 4) {
+  friendship_df %>%
+    mutate(
+      previous_streak = rollsum(
+        is_friend,
+        k = window_size,
+        fill = NA,
+        align = "right"
+      ),
+      next_streak = rollsum(
+        is_friend,
+        k = window_size,
+        fill = NA,
+        align = "left"
+      ),
+    )
+}
+
 add_connection_logic <- function(friendship_df, window_size=7) {
   friendship_df %>% 
+    add_streaks %>% 
       mutate(
-    previous_streak = rollsum(is_friend, k=window_size, fill=NA, align="right"),
-    next_streak = rollsum(is_friend, k=window_size, fill=NA, align="left"),
     friend_ratio = next_streak / previous_streak,
     new_connection = (friend_ratio >= 3) & next_streak > 1, 
     lost_connection = (previous_streak == 0) & !new_connection
@@ -104,6 +121,34 @@ calc_weekly_pagerank <- function(graph) {
   tibble(id = names(pr), pagerank = pr, week = get_edge_identifier(graph, id_col="week"))
 }
 
+
+create_friendship_funk <- function(pair_df, date_col = "date") {
+  pair_df %>% 
+  dplyr::group_by(pair_key, !!sym(date_col)) %>% 
+  summarise(friendship = sum(weight)) %>% 
+  mutate(date = as.Date(!!sym(date_col))) %>% 
+  group_by(pair_key) %>% 
+  mutate(ewma_friendship = ewma.filter(friendship, ratio=0.95), 
+         log_ewma_friend = log(ewma_friendship)) %>% 
+  ungroup() %>% 
+  mutate(is_friend = log_ewma_friend > 0.2)
+}
+
+get_clusters <- function(x, num_clusters=2) {
+  as.factor(kmeans(x, centers=num_clusters)$cluster)
+}
+
+create_friendship_funk <- function(pair_df, date_col = "date") {
+  pair_df %>% 
+  dplyr::group_by(pair_key, !!sym(date_col)) %>% 
+  summarise(friendship = sum(weight)) %>% 
+  mutate(date = as.Date(!!sym(date_col))) %>% 
+  group_by(pair_key) %>% 
+  mutate(ewma_friendship = ewma.filter(friendship, ratio=0.95), 
+         log_ewma_friend = log(ewma_friendship)) %>% 
+  ungroup() %>% 
+  mutate(is_friend = log_ewma_friend > 0.2)
+}
 ```
 
 
@@ -159,8 +204,6 @@ week_dat <- dat %>%
   group_by(to, from, week) %>% 
   summarise(weight = sum(weight)) 
 
-week_dat %>% 
-  arrange(week)
 ```
 
 ## Calculating entropy
@@ -204,17 +247,6 @@ friendship_df <- pair_df %>%
   ungroup() %>% 
   mutate(is_friend = log_ewma_friend > 0.2) 
 
-create_friendship_funk <- function(pair_df, date_col = "date") {
-  pair_df %>% 
-  dplyr::group_by(pair_key, !!sym(date_col)) %>% 
-  summarise(friendship = sum(weight)) %>% 
-  mutate(date = as.Date(!!sym(date_col))) %>% 
-  group_by(pair_key) %>% 
-  mutate(ewma_friendship = ewma.filter(friendship, ratio=0.95), 
-         log_ewma_friend = log(ewma_friendship)) %>% 
-  ungroup() %>% 
-  mutate(is_friend = log_ewma_friend > 0.2)
-}
 
 
 con_df <- friendship_df %>% 
@@ -332,7 +364,6 @@ week_graphs <- week_dat %>%
 pagerank_df <- week_graphs %>% 
   map_dfr(calc_weekly_pagerank)
 
-pagerank_df
 
 msg_df <- week_dat %>%
   group_by(from, week) %>%
@@ -374,7 +405,6 @@ for (i in 1:max(participants$id)) {
 ```
 
 ```{r}
-msg_df
 
 model_data <- pagerank_df %>% 
   unite(join_id, id, week, remove=FALSE) %>% 
@@ -392,6 +422,64 @@ write_csv(model_data, "brms_model_data.csv")
 
 model_data %>% 
   summarise(across(everything(), ~sum(is.na(.x))))
+```
+
+```{r}
+msg_summary <- week_dat %>% 
+  group_by(from, to, week) %>% 
+  summarise(num_msgs = sum(weight), 
+            log_msgs = log(num_msgs)) 
+
+plot_data <- msg_summary %>% 
+  filter(from=="235")
+
+
+
+plot_data %>% 
+  ggplot(aes(x = log_msgs, colour = from)) + 
+  geom_density() + 
+  geom_vline(xintercept = mean(plot_data$log_msgs))
+
+
+
+
+msg_summary <- msg_summary %>% 
+  group_by(from) %>% 
+  mutate(cluster = get_clusters(log_msgs)) %>% 
+  ungroup() 
+
+msg_summary %>% 
+  ggplot(aes(x = log_msgs, fill = cluster)) + 
+  geom_histogram() + 
+  facet_wrap(~from)
+
+
+```
+
+```{r}
+new_con_df <- msg_summary %>% 
+  group_by(from) %>% 
+  mutate(mean_1 = mean(log_msgs[cluster == "1"]),
+         mean_2 = mean(log_msgs[cluster == "2"]), 
+         ) %>% 
+  mutate(is_friend = as.numeric(cluster) - 1, 
+         is_friend = if_else(mean_1 < mean_2, as.logical(is_friend), !is_friend)) %>% 
+ add_connection_logic(window_size = 4) %>% 
+ group_by(id=from, week) %>% 
+ summarise(new_cons = sum(new_connection)) 
+
+new_con_df %>% 
+  group_by(week) %>% 
+  summarise(mean_new_con = mean(new_cons)) %>% 
+  ggplot(aes(x = week, y=mean_new_con)) + 
+  geom_line()
+
+model_data %>% 
+  unite(join_id, id, week, remove=FALSE) %>% 
+  left_join(unite(new_con_df, join_id, id, week)) %>%  
+  mutate(new_cons = replace_na(new_cons, 0)) %>% 
+  select(-join_id) %>% 
+  write_csv("brms_model_data.csv")
 ```
 
 Funk som man kunne tilføje
