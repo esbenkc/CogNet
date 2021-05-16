@@ -104,6 +104,18 @@ calc_weekly_pagerank <- function(graph) {
   tibble(id = names(pr), pagerank = pr, week = get_edge_identifier(graph, id_col="week"))
 }
 
+
+create_friendship_funk <- function(pair_df, date_col = "date") {
+  pair_df %>% 
+  dplyr::group_by(pair_key, !!sym(date_col)) %>% 
+  summarise(friendship = sum(weight)) %>% 
+  mutate(date = as.Date(!!sym(date_col))) %>% 
+  group_by(pair_key) %>% 
+  mutate(ewma_friendship = ewma.filter(friendship, ratio=0.95), 
+         log_ewma_friend = log(ewma_friendship)) %>% 
+  ungroup() %>% 
+  mutate(is_friend = log_ewma_friend > 0.2)
+}
 ```
 
 
@@ -159,8 +171,6 @@ week_dat <- dat %>%
   group_by(to, from, week) %>% 
   summarise(weight = sum(weight)) 
 
-week_dat %>% 
-  arrange(week)
 ```
 
 ## Calculating entropy
@@ -374,7 +384,6 @@ for (i in 1:max(participants$id)) {
 ```
 
 ```{r}
-msg_df
 
 model_data <- pagerank_df %>% 
   unite(join_id, id, week, remove=FALSE) %>% 
@@ -393,6 +402,7 @@ write_csv(model_data, "brms_model_data.csv")
 model_data %>% 
   summarise(across(everything(), ~sum(is.na(.x))))
 ```
+
 
 Funk som man kunne tilføje
 - temporale dynamikker i netværket (e.g. avg. response time)
