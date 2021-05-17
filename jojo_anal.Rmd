@@ -16,7 +16,7 @@ rawdat <- read_csv("brms_model_data.csv")
 
 ```{r}
 dat %>% 
-  ggplot(aes(x=log(new_cons))) + 
+  ggplot(aes(x=new_cons)) + 
   geom_histogram()
 
 dat %>% 
@@ -35,29 +35,28 @@ dat %>%
 
 m0_f <- bf(new_cons ~ 0 + timecol + lockdown*pagerank*trans + (1 | id))
 
-get_prior(m1_f, data=dat, family=zero_inflated_poisson())
 
-m1_f <- bf(new_cons ~ 0 + timecol + lockdown + lockdown:pagerank + lockdown:trans + lockdown:pagerank:trans + (1 + timecol | id))
+m1_f <- bf(new_cons ~ 0 + timecol + lockdown + lockdown:pagerank + lockdown:trans + (1 + timecol | id))
 
-
+get_prior(m1_f, data=dat, family=negbinomial())
 
 m0_priors <- c(
   prior(normal(0, 0.01), class=b), 
   prior(normal(0, 0.01), class=sd), 
-  prior(beta(1, 1), class=zi), 
-  prior(lkj(1), class=cor)
+  prior(gamma(0.01, 0.01), class=shape),
+  prior(lkj(0.3), class=cor)
 )
  
 m0_prior_model <- brm(
   m1_f,
   dat,
-  family=zero_inflated_poisson(),
+  family=negbinomial(),
   prior=m0_priors,
   sample_prior = "only",
   cores = 2,
   chains = 2,
   backend = "cmdstanr", 
-  control = list(adapt_delta = 0.99))
+  control = list(adapt_delta = 0.99, max_treedepth=20))
 
 pp_check(m0_prior_model, nsamples=100)
 
@@ -75,5 +74,10 @@ job::job(brm_result = {
 summary(m0_testy)
 hypothesis(m0_testy, "lockdownTRUE < lockdownFALSE")
 hypothesis(m0_testy, "abs(lockdownTRUE:pagerank) > 0")
+```
+
+```{r}
+summary(brm_result$fit)
+brm_result$pos_check
 ```
 
