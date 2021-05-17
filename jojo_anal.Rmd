@@ -108,6 +108,11 @@ for (col in cols_of_interest) {
   print(prior_posterior_update(posterior, col))
 }
 ```
+# chain plot 
+```{r}
+bayes_pos <- as.array(brm_result$fit)
+bayesplot::mcmc_trace(bayes_pos, pars = cols_of_interest)
+```
 
 
 
