@@ -362,12 +362,13 @@ sum_df %>%
 
 
 ```{r}
-node_df <- read_csv("all_node_measures.csv")
+node_df <- read_csv("all_node_measures.csv") %>% 
+  mutate(name=as.factor(name))
 
 node_df %>%
   filter(unit=="week") %>% 
   ggplot() +
-  aes(date, centrality_degreein, color=name) +
+  aes(date, eigenvector_centrality, color=name) +
   annotate("rect", xmin=as.Date("2020-02-03"), 
            xmax=as.Date("2020-06-08"), ymin=0, ymax=100, 
            alpha=0.04, fill="black") +
@@ -385,7 +386,7 @@ node_df %>%
            y=95, label="3rd semester") +
   geom_jitter(alpha=0.2, size=0.5, width=30) +
   geom_smooth(se=F, size=0.2, method="gam") +
-  geom_smooth(aes(date, centrality_degreein, color=NA), 
+  geom_smooth(aes(date, eigenvector_centrality, color=NA), 
               se=F, size=1.3, color="black", method="gam") +
   geom_vline(xintercept=as.Date("2020-03-13"), 
              color="black", size=1, linetype="dashed") +
@@ -400,11 +401,269 @@ node_df %>%
            alpha=0.85, x=as.Date("2020-12-03"), 
            y=25, label="Averaged\nmodel", 
            hjust="left", lineheight=0.9) +
-  coord_cartesian(ylim=c(0,700), clip="off", 
+  coord_cartesian(ylim=c(0,1), clip="off", 
                   expand=F) +
-  labs(title="Messages sent by person",
-       subtitle="With individual and averaged trends represented by smoothed lines.")
+  labs(title="Eigenvector centrality",
+       subtitle="With individual and averaged trends represented by smoothed lines.",
+       y="Eigenvector centrality")
 
+```
+```{r}
+node_df <- read_csv("all_node_measures.csv") %>% 
+  mutate(name=as.factor(name))
+
+node_df %>%
+  filter(unit=="week") %>% 
+  ggplot() +
+  aes(date, scaled_shannon_entropy, color=name) +
+  annotate("rect", xmin=as.Date("2020-02-03"), 
+           xmax=as.Date("2020-06-08"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2020-08-31"), 
+           xmax=as.Date("2021-01-04"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2019-08-26"), 
+           xmax=as.Date("2020-01-14"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("text", x=as.Date("2019-11-01"), 
+           y=95, label="1st semester") + 
+  annotate("text", x=as.Date("2020-04-06"), 
+           y=95, label="2nd semester") + 
+  annotate("text", x=as.Date("2020-11-01"), 
+           y=95, label="3rd semester") +
+  geom_jitter(alpha=0.2, size=0.5, width=30) +
+  geom_smooth(se=F, size=0.2, method="gam") +
+  geom_smooth(aes(date, scaled_shannon_entropy, color=NA), 
+              se=F, size=1.3, color="black", method="gam") +
+  geom_vline(xintercept=as.Date("2020-03-13"), 
+             color="black", size=1, linetype="dashed") +
+  theme_minimal() +
+  theme(legend.position="none") +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-03-20"), 
+           hjust="left", color="black", y=75, 
+           label="Covid-19 lockdown\nin Denmark", 
+           lineheight=0.9) +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-12-03"), 
+           y=25, label="Averaged\nmodel", 
+           hjust="left", lineheight=0.9) +
+  coord_cartesian(ylim=c(0,1), clip="off", 
+                  expand=F) +
+  labs(title="Scaled Shannon entropy",
+       subtitle="With individual and averaged trends represented by smoothed lines.",
+       y="Scaled Shannon entropy")
+
+```
+
+```{r}
+node_df <- read_csv("all_node_measures.csv") %>% 
+  mutate(name=as.factor(name))
+
+
+
+node_df %>%
+  filter(unit=="week") %>% 
+  ggplot() +
+  aes(date, hub_centrality, color=name) +
+  annotate("rect", xmin=as.Date("2020-02-03"), 
+           xmax=as.Date("2020-06-08"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2020-08-31"), 
+           xmax=as.Date("2021-01-04"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2019-08-26"), 
+           xmax=as.Date("2020-01-14"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("text", x=as.Date("2019-11-01"), 
+           y=95, label="1st semester") + 
+  annotate("text", x=as.Date("2020-04-06"), 
+           y=95, label="2nd semester") + 
+  annotate("text", x=as.Date("2020-11-01"), 
+           y=95, label="3rd semester") +
+  geom_jitter(alpha=0.2, size=0.5, width=30) +
+  geom_smooth(se=F, size=0.2, method="gam") +
+  geom_smooth(aes(date, hub_centrality, color=NA), 
+              se=F, size=1.3, color="black", method="gam") +
+  geom_vline(xintercept=as.Date("2020-03-13"), 
+             color="black", size=1, linetype="dashed") +
+  theme_minimal() +
+  theme(legend.position="none") +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-03-20"), 
+           hjust="left", color="black", y=75, 
+           label="Covid-19 lockdown\nin Denmark", 
+           lineheight=0.9) +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-12-03"), 
+           y=25, label="Averaged\nmodel", 
+           hjust="left", lineheight=0.9) +
+  coord_cartesian(ylim=c(0,1), clip="off", 
+                  expand=F) +
+  labs(title="Hub centrality",
+       subtitle="With individual and averaged trends represented by smoothed lines.",
+       y="Hub centrality")
+
+```
+
+```{r}
+node_df <- read_csv("all_node_measures.csv") %>% 
+  mutate(name=as.factor(name))
+
+node_df %>%
+  filter(unit=="week") %>% 
+  ggplot() +
+  aes(date, pagerank, color=name) +
+  annotate("rect", xmin=as.Date("2020-02-03"), 
+           xmax=as.Date("2020-06-08"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2020-08-31"), 
+           xmax=as.Date("2021-01-04"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2019-08-26"), 
+           xmax=as.Date("2020-01-14"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("text", x=as.Date("2019-11-01"), 
+           y=95, label="1st semester") + 
+  annotate("text", x=as.Date("2020-04-06"), 
+           y=95, label="2nd semester") + 
+  annotate("text", x=as.Date("2020-11-01"), 
+           y=95, label="3rd semester") +
+  geom_jitter(alpha=0.2, size=0.5, width=30) +
+  geom_smooth(se=F, size=0.2, method="gam") +
+  geom_smooth(aes(date, pagerank, color=NA), 
+              se=F, size=1.3, color="black", method="gam") +
+  geom_vline(xintercept=as.Date("2020-03-13"), 
+             color="black", size=1, linetype="dashed") +
+  theme_minimal() +
+  theme(legend.position="none") +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-03-20"), 
+           hjust="left", color="black", y=75, 
+           label="Covid-19 lockdown\nin Denmark", 
+           lineheight=0.9) +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-12-03"), 
+           y=25, label="Averaged\nmodel", 
+           hjust="left", lineheight=0.9) +
+  coord_cartesian(ylim=c(0,0.12), clip="off", 
+                  expand=F) +
+  labs(title="Pagerank",
+       subtitle="With individual and averaged trends represented by smoothed lines.",
+       y="Pagerank")
+
+```
+
+# Removing dropouts
+```{r}
+
+do <- read_csv("dropout_dat.csv")
+keepers <- do %>% 
+  filter(still_cogsci==1) %>% 
+  select(name) %>% 
+  as.list
+keepers <- keepers[[1]]
+node_df <- read_csv("all_node_measures.csv") %>% 
+  filter(name %in% keepers) %>% 
+  mutate(name=as.factor(name))
+
+node_df %>%
+  filter(unit=="week") %>% 
+  ggplot() +
+  aes(date, eigenvector_centrality, color=name) +
+  annotate("rect", xmin=as.Date("2020-02-03"), 
+           xmax=as.Date("2020-06-08"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2020-08-31"), 
+           xmax=as.Date("2021-01-04"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2019-08-26"), 
+           xmax=as.Date("2020-01-14"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("text", x=as.Date("2019-11-01"), 
+           y=95, label="1st semester") + 
+  annotate("text", x=as.Date("2020-04-06"), 
+           y=95, label="2nd semester") + 
+  annotate("text", x=as.Date("2020-11-01"), 
+           y=95, label="3rd semester") +
+  geom_jitter(alpha=0.5, size=0.5, width=30) +
+  geom_smooth(se=F, size=0.2, method="gam") +
+  geom_smooth(aes(date, eigenvector_centrality, color=NA), 
+              se=F, size=1.3, color="black", method="gam") +
+  geom_vline(xintercept=as.Date("2020-03-13"), 
+             color="black", size=1, linetype="dashed") +
+  theme_minimal() +
+  theme(legend.position="none") +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-03-20"), 
+           hjust="left", color="black", y=75, 
+           label="Covid-19 lockdown\nin Denmark", 
+           lineheight=0.9) +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-12-03"), 
+           y=25, label="Averaged\nmodel", 
+           hjust="left", lineheight=0.9) +
+  coord_cartesian(ylim=c(0,1), clip="off", 
+                  expand=F) +
+  labs(title="Eigenvector centrality",
+       subtitle="With individual and averaged trends represented by smoothed lines.",
+       y="Eigenvector centrality")
+
+```
+
+```{r}
+do <- read_csv("dropout_dat.csv")
+keepers <- do %>% 
+  filter(still_cogsci==1) %>% 
+  select(name) %>% 
+  as.list
+keepers <- keepers[[1]]
+node_df <- read_csv("all_node_measures.csv") %>% 
+  filter(name %in% keepers) %>% 
+  mutate(name=as.factor(name))
+
+node_df %>%
+  filter(unit=="week") %>% 
+  filter(unit=="week") %>% 
+  ggplot() +
+  aes(date, pagerank, color=name) +
+  annotate("rect", xmin=as.Date("2020-02-03"), 
+           xmax=as.Date("2020-06-08"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2020-08-31"), 
+           xmax=as.Date("2021-01-04"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("rect", xmin=as.Date("2019-08-26"), 
+           xmax=as.Date("2020-01-14"), ymin=0, ymax=100, 
+           alpha=0.04, fill="black") +
+  annotate("text", x=as.Date("2019-11-01"), 
+           y=95, label="1st semester") + 
+  annotate("text", x=as.Date("2020-04-06"), 
+           y=95, label="2nd semester") + 
+  annotate("text", x=as.Date("2020-11-01"), 
+           y=95, label="3rd semester") +
+  geom_jitter(alpha=0.2, size=0.5, width=30) +
+  geom_smooth(se=F, size=0.2, method="gam") +
+  geom_smooth(aes(date, pagerank, color=NA), 
+              se=F, size=1.3, color="black", method="gam") +
+  geom_vline(xintercept=as.Date("2020-03-13"), 
+             color="black", size=1, linetype="dashed") +
+  theme_minimal() +
+  theme(legend.position="none") +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-03-20"), 
+           hjust="left", color="black", y=75, 
+           label="Covid-19 lockdown\nin Denmark", 
+           lineheight=0.9) +
+  annotate("label", label.r=unit(0, units="lines"), 
+           alpha=0.85, x=as.Date("2020-12-03"), 
+           y=25, label="Averaged\nmodel", 
+           hjust="left", lineheight=0.9) +
+  coord_cartesian(ylim=c(0,0.12), clip="off", 
+                  expand=F) +
+  labs(title="Pagerank",
+       subtitle="With individual and averaged trends represented by smoothed lines.",
+       y="Pagerank")
 ```
 
 
