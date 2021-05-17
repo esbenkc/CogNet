@@ -92,11 +92,10 @@ add_connection_logic <- function(friendship_df, window_size=7) {
   friendship_df %>% 
     add_streaks %>% 
       mutate(
-    friend_ratio = next_streak / previous_streak,
-    new_connection = (friend_ratio >= 3) & next_streak > 1, 
+    previos_average = next_streak / previous_streak,
+    new_connection = (friend_ratio >= 2) & next_streak > 1, 
     lost_connection = (previous_streak == 0) & !new_connection
-  ) %>% 
-    select(-c(previous_streak, next_streak, friend_ratio))
+  )  
 }
 
 
@@ -390,13 +389,15 @@ msg_df <- week_dat %>%
 ```{r}
 week_friends <- week_graphs %>% 
   map_dfr(add_pairs) %>% 
-  create_friendship_funk(date_col = "week")
-
+  create_friendship_funk(date_col = "week") %>%
+  group_by(pair_key) %>% 
+  mutate(previous_weight = rollsum(friendship, 4, fill = NA, align = "right") / 4, 
+         new_con = friendship > (2*previous_weight))
+  
 participants <- week_graphs[[2]] %>% 
   activate(nodes) %>% 
   as_tibble %>% 
   mutate(id = row_number())
-
 
 
 num_friends_df <- tibble()
@@ -405,13 +406,19 @@ for (i in 1:max(participants$id)) {
   temp_df <- week_friends %>%
     filter(str_detect(pair_key, pattern)) %>%
     group_by(date) %>%
-    summarise(num_friends = sum(is_friend)) %>%
+    summarise(num_friends = sum(is_friend), 
+              new_cons = sum(new_con)) %>%
     ungroup() %>%
     mutate(id = participants$name[[i]])
   
   num_friends_df <- num_friends_df %>% 
     bind_rows(temp_df)
 }
+
+num_friends_df %>% 
+  ggplot(aes(x=new_cons)) +
+  geom_histogram()
+
 ```
 
 ```{r}
@@ -454,27 +461,28 @@ msg_summary %>%
 ```
 
 ```{r}
-new_con_df <- msg_summary %>% 
-  group_by(from) %>% 
-  mutate(mean_1 = mean(log_msgs[cluster == "1"]),
-         mean_2 = mean(log_msgs[cluster == "2"]), 
-         ) %>% 
-  mutate(is_friend = as.numeric(cluster) - 1, 
-         is_friend = if_else(mean_1 < mean_2, as.logical(is_friend), !is_friend)) %>% 
- add_connection_logic(window_size = 4) %>% 
- group_by(id=from, week) %>% 
- summarise(new_cons = sum(new_connection)) 
 
-new_con_df %>% 
-  group_by(week) %>% 
-  summarise(mean_new_con = mean(new_cons)) %>% 
-  ggplot(aes(x = week, y=mean_new_con)) + 
-  geom_line()
-
-model_data <- model_data %>% 
-  unite(join_id, id, week, remove=FALSE) %>% 
-  left_join(unite(new_con_df, join_id, id, week)) %>%  
-  mutate(new_cons = replace_na(new_cons, 0))
+# new_con_df <- msg_summary %>% 
+#   group_by(from) %>% 
+#   mutate(mean_1 = mean(log_msgs[cluster == "1"]),
+#          mean_2 = mean(log_msgs[cluster == "2"]), 
+#          ) %>% 
+#   mutate(is_friend = as.numeric(cluster) - 1, 
+#          is_friend = if_else(mean_1 < mean_2, as.logical(is_friend), !is_friend)) %>% 
+#  add_connection_logic(window_size = 4) %>% 
+#  group_by(id=from, week) %>% 
+#  summarise(new_cons = sum(new_connection)) 
+# 
+# new_con_df %>% 
+#   group_by(week) %>% 
+#   summarise(mean_new_con = mean(new_cons)) %>% 
+#   ggplot(aes(x = week, y=mean_new_con)) + 
+#   geom_line()
+# 
+# model_data <- model_data %>% 
+#   unite(join_id, id, week, remove=FALSE) %>% 
+#   left_join(unite(new_con_df, join_id, id, week)) %>%  
+#   mutate(new_cons = replace_na(new_cons, 0))
 ```
 ### Adding transitivity / centrality
 ```{r}
@@ -491,6 +499,19 @@ model_data %>%
   left_join(trans_df) %>% 
   write_csv("brms_model_data.csv")
 ```
+
+```{r}
+new_con_df %>% 
+  ggplot(aes(x=new_cons)) + 
+  geom_histogram()
+
+model_data <- read_csv("brms_model_data.csv")
+
+model_data %>% 
+  ggplot(aes(x = new_cons)) +
+  geom_histogram()
+```
+
 
 Funk som man kunne tilføje
 - temporale dynamikker i netværket (e.g. avg. response time)
