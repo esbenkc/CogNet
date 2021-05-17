@@ -14,16 +14,6 @@ pacman::p_load(tidyverse, brms, job)
 rawdat <- read_csv("brms_model_data.csv")
 ```
 
-```{r}
-dat %>% 
-  ggplot(aes(x=new_cons)) + 
-  geom_histogram()
-
-dat %>% 
-  ggplot(aes(x=week, y=log(new_cons))) + 
-  geom_point() + 
-  geom_smooth()
-```
 
 ```{r}
 dat <- rawdat %>% 
@@ -81,3 +71,13 @@ summary(brm_result$fit)
 brm_result$pos_check
 ```
 
+```{r}
+dat %>% 
+  ggplot(aes(x=new_cons)) + 
+  geom_histogram()
+
+dat %>% 
+  ggplot(aes(x=week, y=log(new_cons))) + 
+  geom_point() + 
+  geom_smooth()
+```

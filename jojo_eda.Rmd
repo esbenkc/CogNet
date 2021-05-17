@@ -431,11 +431,9 @@ model_data <- pagerank_df %>%
   fill(vacation, lockdown) %>% 
   ungroup() %>% 
   mutate(num_msgs = replace_na(num_msgs, 0)) %>% 
-  drop_na() %>% 
-  select(-join_id)
+  drop_na() 
   
 
-write_csv(model_data, "brms_model_data.csv")
 
 model_data %>% 
   summarise(across(everything(), ~sum(is.na(.x))))
@@ -496,7 +494,7 @@ trans_df <- week_graphs %>%
   unite(join_id, id, week)
 
 model_data %>% 
-  left_join(trans_df) %>% 
+  left_join(trans_df) %>%  
   write_csv("brms_model_data.csv")
 ```
 
