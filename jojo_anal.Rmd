@@ -119,10 +119,23 @@ bayesplot::mcmc_trace(bayes_pos, pars = cols_of_interest)
 ```{r}
 dat %>% 
   ggplot(aes(x=new_cons)) + 
-  geom_histogram()
+  geom_histogram(binwidth = 1)
 
 dat %>% 
   ggplot(aes(x=week, y=log(new_cons))) + 
   geom_point() + 
   geom_smooth()
 ```
+```{r}
+posterior_comparison <- function(posterior, variable = ":trans") {
+  pos_col <- paste0("b_lockdownTRUE", variable)
+  neg_col <- pasteo("b_lockdownFALSE", variable)
+  posterior %>% 
+    mutate(pos_df = !!sym(pos_col)-!!sym(neg_col)) %>% 
+    pull(pos_df) %>% 
+    density()
+}
+ 
+length(density(c(1,2,1,1))$y)
+```
+
