@@ -40,6 +40,7 @@ users in the group (the sender inclusive).
 | `brms_analysis.Rmd`            | Bayesian analysis and visualization document using `brms`.                                                                   |
 | `timeseries_visualization.Rmd` | Visualizes `all_node_measures.csv` by week in a range of different narrative graphs.                                         |
 | `network_eda.Rmd`              | Explores one week of data around the lockdown as a static network. Preliminary work for `convert.r`.                         |
+| `anonymize_messages.py`        | Anonymizes the raw Messenger data files (\~1-3GB) from Facebook to focused files (3-10MB) used as input for `data_load.py`.  |
 
 ## License
 
