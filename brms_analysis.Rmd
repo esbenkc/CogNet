@@ -1,0 +1,231 @@
+---
+title: "Soccult anal"
+author: "Esbo Rystrøm"
+date: "16/5/2021"
+output: html_document
+---
+
+```{r packages}
+pacman::p_load(tidyverse, brms, job)
+```
+
+```{r read data}
+rawdat <- read_csv("brms_model_data.csv")
+```
+
+```{r pre-processing}
+rawdat
+
+dat <- rawdat %>% 
+  subset(select=c(id, lockdown, week, trans, pagerank, new_cons)) %>% 
+  drop_na() %>% 
+  mutate(timecol = as.integer(as.factor(week)),
+         pagerank=normalise(pagerank),
+         trans=normalise(trans))
+
+dat %>% 
+  filter(new_cons > 0 ) %>% 
+  summarise(mean(log(new_cons)), sd(log(new_cons)))
+```
+
+```{r m0}
+dat <- rawdat %>% 
+  mutate(timecol = as.integer(as.factor(week)))
+
+dat %>% 
+  filter(new_cons > 0 ) %>% 
+  summarise(mean(log(new_cons)), sd(log(new_cons)))
+
+m0_f <- bf(new_cons ~ 0 + timecol + pagerank + trans + (1 + timecol | id))
+
+get_prior(m1_f, data=dat, family=negbinomial())
+
+m0_priors_m0 <- c(
+  prior(normal(0, 0.1), class=b), 
+  prior(normal(0, 0.1), class=sd), 
+  prior(gamma(0.01, 0.01), class=shape),
+  prior(lkj(1), cor)
+)
+ 
+# m0_prior_model_m0 <- brm(
+#   m1_f,
+#   dat,
+#   family=negbinomial(),
+#   prior=m0_priors_m0,
+#   sample_prior = "only",
+#   cores = 6,
+#   chains = 4,
+#   backend = "cmdstanr", 
+#   control = list(adapt_delta = 0.99, max_treedepth=20))
+# 
+# pp_check(m0_prior_model_m0, nsamples=100)
+
+brm_result_m0 <- brm(
+  m0_f,
+  dat,
+  family=negbinomial(),
+  prior=m0_priors_m0,
+  sample_prior = T,
+  cores = 6,
+  chains = 4,
+  backend = "cmdstanr", 
+  control = list(adapt_delta = 0.99, max_treedepth=20))
+
+```
+
+```{r m1}
+m1_f <- bf(new_cons ~ 0 + timecol + lockdown + lockdown:pagerank + lockdown:trans + (1 + timecol | id))
+
+get_prior(m1_f, data=dat, family=negbinomial())
+
+m0_priors_m1 <- c(
+  prior(normal(0, 0.1), class=b), 
+  prior(normal(0, 0.1), class=sd), 
+  prior(gamma(0.01, 0.01), class=shape),
+  prior(lkj(1), class=cor)
+)
+ 
+# m0_prior_model_m1 <- brm(
+#   m1_f,
+#   dat,
+#   family=negbinomial(),
+#   prior=m0_priors_m1,
+#   sample_prior = "only",
+#   cores = 6,
+#   chains = 4,
+#   backend = "cmdstanr", 
+#   control = list(adapt_delta = 0.99, max_treedepth=20))
+
+# pp_check(m0_prior_model, nsamples=100)
+
+brm_result_m1 <- brm(
+  m1_f,
+  dat,
+  family=negbinomial(),
+  prior=m0_priors_m1,
+  sample_prior = T,
+  cores = 3,
+  chains = 4,
+  backend = "cmdstanr", 
+  control = list(adapt_delta = 0.99, max_treedepth=20))
+
+```
+
+```{r hypotheses, fig.width=4}
+summary(brm_result_m1)
+
+hypothesis(brm_result_m1, "exp(lockdownTRUE) > exp(lockdownFALSE)")
+
+hypothesis(brm_result_m1, "exp(lockdownTRUE:pagerank) > exp(lockdownFALSE:pagerank)")
+
+hypothesis(brm_result_m1, "exp(lockdownTRUE:trans) > exp(lockdownFALSE:trans)")
+
+```
+
+```{r hypotheses plotting}
+
+
+posterior_m1 <- posterior_samples(brm_result_m1)
+posterior_comparison <- function(variable=":trans") {
+  pos_val <- paste0("b_lockdownTRUE", variable)
+  neg_val <- paste0("b_lockdownFALSE", variable)
+  dif <- posterior_m1 %>% 
+    mutate(post_df=!!sym(pos_val)-!!sym(neg_val),
+           Contrast=paste(pos_val, neg_val))
+  return(dif)
+}
+
+variables <- c("",":pagerank",":trans")
+
+variables %>% 
+  map_dfr(posterior_comparison) %>% 
+  ggplot() +
+  aes(post_df, fill=Contrast) +
+  geom_density(alpha=0.3) +
+  geom_vline(xintercept=0) +
+  theme_minimal() +
+  coord_cartesian(expand=F) +
+  labs(x="Difference",
+       y="Density") +
+  theme(legend.position="top") + 
+  scale_fill_discrete(labels = c('1: Lockdown','2: Lockdown:PageRank','3: Lockdown:Clustering'))
+
+```
+
+```{r predictive check, fig.width=6, fig.height=3}
+p1 <- brm_result_m0 %>% pp_check() %>% 
+  as.ggplot() +
+  labs(title="Predictive check", subtitle="Model 0")
+p2<- brm_result_m1 %>% pp_check() %>% 
+  as.ggplot() +
+  labs(title="",subtitle="Model 1")
+
+gridExtra::grid.arrange(p1,p2, ncol=2)
+
+```
+
+```{r loo}
+brm_result_m0 <- add_criterion(brm_result_m0, criterion="loo")
+brm_result_m1 <- add_criterion(brm_result_m1, criterion="loo")
+loo_compare(brm_result_m0, brm_result_m1)
+loo_model_weights(brm_result_m0,brm_result_m1)
+
+brm_result_m0 %>% summary
+brm_result_m1 %>% summary
+
+```
+
+```{r m0 posterior update plots, fig.width=6, fig.height=4}
+posterior_m0 <- posterior_samples(brm_result_m0)
+
+prior_posterior_update <- function(effect_col, subtitle_hyp) {
+ggplot(posterior_m0) +
+  theme_classic() +
+  geom_density(aes(prior_b), fill="red", alpha=0.3) +
+  geom_density(aes(!!sym(effect_col)), fill="blue", alpha=0.5) + 
+  theme_minimal()+
+  labs(subtitle = paste("Posterior update of", subtitle_hyp),
+       x="",
+       y="") +
+    theme(plot.subtitle = element_text(size=10))
+}
+
+subtitle_hyp <- c("Time", "PageRank", "Clustering")
+cols_of_interest <- c("b_timecol","b_pagerank", "b_trans") 
+
+pl <- map2(cols_of_interest, subtitle_hyp, prior_posterior_update)
+
+gridExtra::grid.arrange(pl[[1]], pl[[2]], pl[[3]], ncol=2)
+```
+
+```{r m1 posterior update plots, fig.width=6, fig.height=6}
+posterior_m1 <- posterior_samples(brm_result_m1)
+
+prior_posterior_update <- function(effect_col, subtitle_hyp) {
+ggplot(posterior_m1) +
+  theme_classic() +
+  geom_density(aes(prior_b), fill="red", alpha=0.3) +
+  geom_density(aes(!!sym(effect_col)), fill="blue", alpha=0.5) + 
+  theme_minimal()+
+  labs(subtitle = paste("Posterior update of", subtitle_hyp),
+       x="",
+       y="Density") +
+    theme(plot.subtitle = element_text(size=10))
+}
+
+subtitle_hyp <- c("Time", "Lockdown", "Lockdown:PageRank", "Open:PageRank", "Lockdown:Clustering", "Open:Clustering")
+cols_of_interest <- c("b_timecol", "b_lockdownTRUE","b_lockdownTRUE:pagerank", "b_lockdownFALSE:pagerank", "b_lockdownTRUE:trans", "b_lockdownFALSE:trans") 
+
+pl <- map2(cols_of_interest, subtitle_hyp, prior_posterior_update)
+
+gridExtra::grid.arrange(pl[[1]], pl[[2]], pl[[3]], pl[[4]], pl[[5]], pl[[6]], ncol=2)
+```
+
+```{r mixing plot, fig.width=6}
+cols_of_interest <- c("b_timecol", "b_lockdownTRUE","b_lockdownTRUE:pagerank", "b_lockdownFALSE:pagerank", "b_lockdownTRUE:trans", "b_lockdownFALSE:trans") 
+bayes_pos <- as.array(brm_result_m1)
+bayesplot::mcmc_trace(bayes_pos, pars = cols_of_interest) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())
+```
+
