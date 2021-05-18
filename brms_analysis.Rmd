@@ -157,7 +157,6 @@ brm_result_m2 <- brm(
 
 ```
 
-
 ```{r hypotheses, fig.width=4}
 summary(brm_result_m1)
 
@@ -267,7 +266,6 @@ pl <- map2(cols_of_interest, subtitle_hyp, prior_posterior_update)
 
 gridExtra::grid.arrange(pl[[1]], pl[[2]], pl[[3]], pl[[4]], pl[[5]], pl[[6]], ncol=2)
 ```
-
 
 ```{r mixing plot, fig.width=6}
 cols_of_interest <- c("b_timecol", "b_lockdownTRUE","b_lockdownTRUE:pagerank", "b_lockdownFALSE:pagerank", "b_lockdownTRUE:trans", "b_lockdownFALSE:trans") 

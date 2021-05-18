@@ -322,7 +322,7 @@ sum_df <- raw_df %>%
   summarise(weight=sum(weight)) %>% 
   rename(id=from)
 
-p1 <- sum_df %>%
+sum_df %>%
   ggplot() +
   aes(day, weight, color=id) +
   annotate("rect", xmin=as.Date("2020-02-03"), 
@@ -349,8 +349,7 @@ p1 <- sum_df %>%
   annotate("label", label.r=unit(0, units="lines"), alpha=0.85, x=as.Date("2020-03-30"), hjust="left", color="black", y=75, label="Covid-19 lockdown\nin Denmark", lineheight=0.9) +
   annotate("label", label.r=unit(0, units="lines"), alpha=0.85, x=as.Date("2020-12-03"), y=18, label="Averaged\nmodel", hjust="left", lineheight=0.9) +
   coord_cartesian(ylim=c(0,100), clip="off", expand=F) +
-  labs(subtitle="A",
-       x="Weeks",
+  labs(x="Weeks",
        y="Messages")
 
 ```
@@ -631,12 +630,12 @@ p2 <- node_df %>%
   annotate("rect", xmin=as.Date("2019-08-26"), 
            xmax=as.Date("2020-01-14"), ymin=0, ymax=0.12, 
            alpha=0.04, fill="black") +
-  # annotate("text", x=as.Date("2019-11-01"), 
-  #          y=0.11, label="1st semester") + 
-  # annotate("text", x=as.Date("2020-04-06"), 
-  #          y=0.11, label="2nd semester") + 
-  # annotate("text", x=as.Date("2020-11-01"), 
-  #          y=0.11, label="3rd semester") +
+  annotate("text", x=as.Date("2019-11-01"),
+           y=0.115, label="1st semester") +
+  annotate("text", x=as.Date("2020-04-06"),
+           y=0.115, label="2nd semester") +
+  annotate("text", x=as.Date("2020-11-01"),
+           y=0.115, label="3rd semester") +
   geom_jitter(alpha=0.2, size=0.5, width=7) +
   geom_smooth(se=F, size=0.2, method="gam") +
   geom_smooth(aes(date, pagerank, color=NA), 
@@ -645,20 +644,20 @@ p2 <- node_df %>%
              color="black", size=1, linetype="dashed") +
   theme_minimal() +
   theme(legend.position="none") +
-  # annotate("label", label.r=unit(0, units="lines"), 
-  #          alpha=0.85, x=as.Date("2020-03-20"), 
-  #          hjust="left", color="black", y=0.08, 
-  #          label="Covid-19 lockdown\nin Denmark", 
-  #          lineheight=0.9) +
-  # annotate("label", label.r=unit(0, units="lines"), 
-  #          alpha=0.85, x=as.Date("2020-12-03"), 
-  #          y=0.04, label="Averaged\nmodel", 
-  #          hjust="left", lineheight=0.9) +
+  annotate("label", label.r=unit(0, units="lines"),
+           alpha=0.85, x=as.Date("2020-03-20"),
+           hjust="left", color="black", y=0.08,
+           label="Covid-19 lockdown\nin Denmark",
+           lineheight=0.9) +
+  annotate("label", label.r=unit(0, units="lines"),
+           alpha=0.85, x=as.Date("2020-12-03"),
+           y=0.04, label="Averaged\nmodel",
+           hjust="left", lineheight=0.9) +
   coord_cartesian(ylim=c(0,0.12), clip="off", 
                   expand=F) +
-  labs(subtitle="B",
-       y="Pagerank",
-       x="Weeks")
+  labs(subtitle="A",
+       y="Pagerank") +
+  theme(axis.title.x = element_blank())
 ```
 
 # New_cons modeling
@@ -714,7 +713,7 @@ p3 <- node_df %>%
   coord_cartesian(ylim=c(0,2), clip="off", 
                   expand=T) +
   scale_y_continuous(expand=c(0,0)) +
-  labs(subtitle="C",
+  labs(subtitle="B",
        y="Local clustering coefficient",
        x="Weeks")
 
@@ -771,7 +770,7 @@ p4 <- node_df %>%
   coord_cartesian(ylim=ylimits, clip="off", 
                   expand=T) + 
   scale_y_continuous(expand=c(0,0)) +
-  labs(subtitle="D",
+  labs(subtitle="C",
        y="New connections",
        x="Weeks")
 ```
@@ -814,8 +813,10 @@ node_df$id %>% unique %>% length
 
 ```
 # Combined
-```{r fig.width=10}
-gridExtra::grid.arrange(p1,p2,p3,p4)
+```{r fig.height=5, fig.width=6}
+gridExtra::grid.arrange(p2,p3,p4, ncol=2, heights=c(5,4), layout_matrix=rbind(c(1,1),
+                                                              c(2,3)))
+
 ```
 
 ```{r fig.width=4}

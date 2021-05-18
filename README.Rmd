@@ -40,7 +40,7 @@ Data analysis project on a whole Cognitive Science student year before and durin
 
 During 1.5 years, 28 students communicated intensely on the social messaging app Facebook as part of the cognitive science bachelor’s program at Aarhus University. These students voluntarily gave us their highly anonymized data (see “Anonymization”). In a post-experimental questionnaire, 100% reported that it was their main communication tool in the study group and 87,5% reported that it was their main communication tool with everyone from the study. 
 
-The anonymized data contains a message per row between two of the 27 users (28 minus 1 dropout). The weight of a message is  for a direct message, while a group message is weighted as  where  is the amount of users in the group (the sender inclusive).
+The anonymized data contains a message per row between two of the 27 users (28 minus 1 dropout). The weight of a message is $1$ for a direct message, while a group message is weighted as $\dfrac{1}{n-1}$ where $n$ is the amount of users in the group (the sender inclusive).
 
 ## Anonymization
 
