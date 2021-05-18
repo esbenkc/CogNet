@@ -14,7 +14,10 @@ rawdat <- read_csv("brms_model_data.csv")
 ```
 
 ```{r pre-processing}
-rawdat
+
+normalise <- function(x){
+  (x - min(x)) / (max(x)-min(x))
+}
 
 dat <- rawdat %>% 
   subset(select=c(id, lockdown, week, trans, pagerank, new_cons)) %>% 
@@ -110,6 +113,49 @@ brm_result_m1 <- brm(
   control = list(adapt_delta = 0.99, max_treedepth=20))
 
 ```
+
+```{r m2 disaster}
+disaster_dat <- read_csv("disaster_dat.csv") %>% 
+  drop_na() %>% 
+  mutate(lockdown=as.integer(lockdown),
+         lost_con=as.integer(lost_con))
+
+m2_f <- bf(lost_con ~ 0 + friendship_strength + friendship_strength:lockdown + (friendship_strength + friendship_strength:lockdown | pair_key))
+
+get_prior(m2_f, data=disaster_dat, family=binomial())
+
+m2_priors <- c(
+  prior(normal(0, 1), class=b), 
+  prior(student_t(3, 0, 2.5), class=sd),
+  prior(lkj(1), class=cor)
+)
+
+m2_prior_model <- brm(
+  m2_f,
+  disaster_dat,
+  family=binomial(link=logit),
+  prior=m2_priors,
+  sample_prior = "only",
+  cores = 6,
+  chains = 4,
+  backend = "cmdstanr",
+  control = list(adapt_delta = 0.99, max_treedepth=20))
+
+pp_check(m2_prior_model, nsamples=100)
+
+m2 <- brm(
+  m2_f,
+  disaster_dat,
+  family=binomial(link=logit),
+  prior=m2_priors,
+  sample_prior = T,
+  cores = 6,
+  chains = 4,
+  backend = "cmdstanr", 
+  control = list(adapt_delta = 0.99, max_treedepth=20))
+
+```
+
 
 ```{r hypotheses, fig.width=4}
 summary(brm_result_m1)
@@ -220,6 +266,7 @@ pl <- map2(cols_of_interest, subtitle_hyp, prior_posterior_update)
 
 gridExtra::grid.arrange(pl[[1]], pl[[2]], pl[[3]], pl[[4]], pl[[5]], pl[[6]], ncol=2)
 ```
+
 
 ```{r mixing plot, fig.width=6}
 cols_of_interest <- c("b_timecol", "b_lockdownTRUE","b_lockdownTRUE:pagerank", "b_lockdownFALSE:pagerank", "b_lockdownTRUE:trans", "b_lockdownFALSE:trans") 
