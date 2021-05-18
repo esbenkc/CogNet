@@ -1,4 +1,4 @@
-pair_key,timecol,week,friendship,previous_weight,lost_con,lockdown
+pair_key,timecol,week,friendship,friendship_strength,lost_con,lockdown
 1 10,4,2019-09-22T00:00:00Z,0.24,0.4,FALSE,FALSE
 1 10,5,2019-09-29T00:00:00Z,0.24,0.21000000000000002,FALSE,FALSE
 1 10,6,2019-10-06T00:00:00Z,0.6,0.30000000000000004,FALSE,FALSE
