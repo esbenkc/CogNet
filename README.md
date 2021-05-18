@@ -26,9 +26,9 @@ in the study group and 87,5% reported that it was their main
 communication tool with everyone from the study.
 
 The anonymized data contains a message per row between two of the 27
-users (28 minus 1 dropout). The weight of a message is \(1\) for a
-direct message, while a group message is weighted as \(\dfrac{1}{n-1}\)
-where \(n\) is the amount of users in the group (the sender inclusive).
+users (28 minus 1 dropout). The weight of a message is *1* for a direct
+message, while a group message is weighted as *1/(n-1)* where *n* is the
+amount of users in the group (the sender inclusive).
 
 ## Anonymization
 
