@@ -120,13 +120,13 @@ disaster_dat <- read_csv("disaster_dat.csv") %>%
   mutate(lockdown=as.integer(lockdown),
          lost_con=as.integer(lost_con))
 
-m2_f <- bf(lost_con ~ 0 + friendship_strength + friendship_strength:lockdown + (friendship_strength + friendship_strength:lockdown | pair_key))
+m2_f <- bf(lost_con ~ 0 + timecol + friendship_strength + friendship_strength:lockdown + (1 + timecol | pair_key))
 
 get_prior(m2_f, data=disaster_dat, family=binomial())
 
 m2_priors <- c(
-  prior(normal(0, 1), class=b), 
-  prior(student_t(3, 0, 2.5), class=sd),
+  prior(normal(0, 0.15), class=b), 
+  prior(normal(0, 0.3), class=sd),
   prior(lkj(1), class=cor)
 )
 
@@ -143,13 +143,14 @@ m2_prior_model <- brm(
 
 pp_check(m2_prior_model, nsamples=100)
 
-m2 <- brm(
+brm_result_m2 <- brm(
   m2_f,
   disaster_dat,
   family=binomial(link=logit),
   prior=m2_priors,
   sample_prior = T,
   cores = 6,
+  threads = threading(2),
   chains = 4,
   backend = "cmdstanr", 
   control = list(adapt_delta = 0.99, max_treedepth=20))
