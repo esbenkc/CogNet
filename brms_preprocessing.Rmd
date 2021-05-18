@@ -243,7 +243,8 @@ week_friends <- week_graphs %>%
   create_friendship_funk(date_col = "week") %>%
   group_by(pair_key) %>% 
   mutate(previous_weight = rollsum(friendship, 4, fill = NA, align = "right") / 4, 
-         new_con = friendship > (2*previous_weight))
+         new_con = friendship > (2*previous_weight), 
+         timecol = as.factor(as.integer(as.factor(week))))
   
 participants <- week_graphs[[2]] %>% 
   activate(nodes) %>% 
@@ -318,10 +319,34 @@ model_data %>%
 
 # Lost connections
 ```{r}
-week_friends %>% 
+
+lost_dat <- week_friends %>% 
   mutate(lost_con = friendship < 0.5 * previous_weight, 
+         lockdown = week %within% first_lockdown | week %within% third_sem,
+         timecol = as.factor(as.integer(as.factor(week)))) %>% 
+  select(pair_key, timecol, friendship, friendship_strength = previous_weight, lost_con, lockdown, week)  
+
+
+week_cols <- tibble(week = unique(lost_dat$week)) %>% 
+  arrange(week) %>% 
+  mutate(timecol = as.factor(as.integer(as.factor(week))))
+
+full_dat <- lost_dat %>% 
+  expand(pair_key, timecol) %>% 
+  left_join(week_cols)
+
+
+
+
+full_dat %>% 
+  left_join(select(week_friends, pair_key, timecol, friendship), by = c("pair_key", "timecol")) %>% 
+  mutate(friendship = replace_na(friendship, 0),
+         previous_weight = rollsum(friendship, 4, fill = NA, align = "right") / 4,
+         lost_con = (friendship < 0.5 * previous_weight) & previous_weight > 0.001, 
          lockdown = week %within% first_lockdown | week %within% third_sem) %>% 
-  select(pair_key, friendship, friendship_strength = previous_weight, lost_con, lockdown) %>% 
+  drop_na() %>%  
+  filter(week < as.Date("2021-01-01")) %>% 
   write_csv("disaster_dat.csv")
+
 ```
 
