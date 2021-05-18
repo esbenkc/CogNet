@@ -322,6 +322,6 @@ week_friends %>%
   mutate(lost_con = friendship < 0.5 * previous_weight, 
          lockdown = week %within% first_lockdown | week %within% third_sem) %>% 
   select(pair_key, friendship, friendship_strength = previous_weight, lost_con, lockdown) %>% 
-  write_csv("distaster_dat.csv")
+  write_csv("disaster_dat.csv")
 ```
 
