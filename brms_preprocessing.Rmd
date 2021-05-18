@@ -5,7 +5,7 @@ date: "11/5/2021"
 output: html_document
 ---
 ```{r}
-pacman::p_load(tidyverse, tidygraph, fastnet, lubridate, reldist, zoo)
+pacman::p_load(tidyverse, tidygraph, fastnet, lubridate, reldist, zoo, ggraph, network, ggraph, netrankr, extrafont, seriation, NetSwan, fastnet)
 ```
 
 # Helper functions
@@ -173,8 +173,6 @@ dropout_dat <- read_csv("dropout_dat.csv")
 ```
 
 ```{r}
-pacman::p_load(tidyverse, network, tidygraph, lubridate, ggraph, netrankr, extrafont, seriation, NetSwan, fastnet)
-
 
 ## CHANGE UNIT HERE
 unit="day"
@@ -214,153 +212,6 @@ week_dat <- dat %>%
   summarise(weight = sum(weight)) 
 
 ```
-
-## Calculating entropy
-```{r}
-graph_list <- dat %>% 
-  group_split(date) %>% 
-  map(create_graph) 
-
-entropy_df <- graph_list %>% 
-  map_dfr(entropy_per_date)
-
-
-entropy_df %>% 
-  mutate(date = as.Date(date)) %>% 
-  ggplot(aes(x=date, y=entropy)) + 
-  geom_line() + 
-  geom_vline(xintercept=as.Date("2020-03-11"), colour="red") + 
-  geom_smooth() + 
-  theme_minimal()
-```
-
-## Calculating GINI-coefficient
-```{r}
-gini_df <- graph_list %>% 
-  map_dfr(calc_gini_per_day)
-```
-
-### The power of friendship
-```{r}
-master_graph <- create_graph(dat)
-
-pair_df <- add_pairs(master_graph)
-
-friendship_df <- pair_df %>% 
-  dplyr::group_by(pair_key, date) %>% 
-  summarise(friendship = sum(weight)) %>% 
-  mutate(date = as.Date(date)) %>% 
-  group_by(pair_key) %>% 
-  mutate(ewma_friendship = ewma.filter(friendship, ratio=0.95), 
-         log_ewma_friend = log(ewma_friendship)) %>% 
-  ungroup() %>% 
-  mutate(is_friend = log_ewma_friend > 0.2) 
-
-
-
-con_df <- friendship_df %>% 
-  group_by(pair_key) %>% 
-  add_connection_logic(window_size = 7)
-
-
-new_cons <- con_df %>% 
-  group_by(date) %>% 
-  summarise(num_new_friends = sum(new_connection, na.rm=T))
-
-new_cons %>% 
-  ggplot(aes(x=date, y=num_new_friends)) + 
-  geom_line() +
-  geom_vline(xintercept=as.Date("2020-03-11"), colour="red")
-
-
-
-friendship_df %>% 
-  filter(date < ymd("2021-01-01")) %>% 
-  group_by(date) %>% 
-  summarise(friend_score = mean(ewma_friendship)) %>% 
-  ggplot(aes(date, friend_score)) + 
-  geom_line()
-
-length(test_sum)
-
-
-new_cons %>% 
-  filter(date %within% third_sem)
-
-entropy_in_interval(new_cons, intro_interval)
-entropy_in_interval(new_cons, second_sem)
-entropy_in_interval(new_cons, first_lockdown)
-entropy_in_interval(new_cons, third_sem)
-```
-
-```{r}
-transitivity(master_graph, type="weighted")
-```
-
-
-
-```{r}
-con_df %>% 
-  ggplot(aes(x = log_ewma_friend)) + 
-  geom_density()
-```
-
-```{r}
-gini_df %>% 
-period_graphs <- sum_dat %>%
-  ungroup() %>% 
-  group_split(period) %>% 
-  map(create_graph)
-
-period_graphs
-
-test_period <- period_graphs[[1]]
-
-test_period
-trans_first <- test_period %>% 
-  transitivity(type = "weighted")
-
-trans_stuff <- period_graphs %>% 
-  map(~transitivity(.x, type="barrat"))
-
-trans_stuff %>% 
-  map_dbl(gini)
-
-
-trans_stuff %>% 
-  map_dbl(mean)
-
-trans_stuff %>% 
-  map_dbl(sd)
-
-
-?t.test
-
-period_graphs %>% 
-  map_chr(get_period)
-period_graphs
-trans_stuff %>% mutate(date = as.Date(date)) %>% 
-  ggplot(aes(x=date, y=gini_coef)) + 
-  geom_line() + 
-  geom_vline(xintercept=as.Date("2020-03-11"), colour="red") + 
-  geom_smooth() + 
-  theme_minimal()
-```
-
-### Check period stuff
-```{r}
-
-```
-
-### Pseudo-model
-```{r}
-alist(num_friends <- num_messages_ewma > threshold)
-alist(num_friends ~ PageRank + vacation + num_messages + lockdown + (1|ID))
-
-# Can be done per week
-
-```
-
 
 ### Let's fckin roll!
 ```{r}
@@ -432,60 +283,14 @@ model_data <- pagerank_df %>%
   ungroup() %>% 
   mutate(num_msgs = replace_na(num_msgs, 0)) %>% 
   drop_na() 
-  
-
 
 model_data %>% 
   summarise(across(everything(), ~sum(is.na(.x))))
 ```
 
-```{r}
-msg_summary <- week_dat %>% 
-  group_by(from, to, week) %>% 
-  summarise(num_msgs = sum(weight), 
-            log_msgs = log(num_msgs)) 
 
-msg_summary <- msg_summary %>% 
-  group_by(from) %>% 
-  mutate(cluster = get_clusters(log_msgs)) %>% 
-  ungroup() 
-
-msg_summary %>% 
-  ggplot(aes(x = log_msgs, fill = cluster)) + 
-  geom_histogram() + 
-  facet_wrap(~from)
-
-
-```
-
-```{r}
-
-# new_con_df <- msg_summary %>% 
-#   group_by(from) %>% 
-#   mutate(mean_1 = mean(log_msgs[cluster == "1"]),
-#          mean_2 = mean(log_msgs[cluster == "2"]), 
-#          ) %>% 
-#   mutate(is_friend = as.numeric(cluster) - 1, 
-#          is_friend = if_else(mean_1 < mean_2, as.logical(is_friend), !is_friend)) %>% 
-#  add_connection_logic(window_size = 4) %>% 
-#  group_by(id=from, week) %>% 
-#  summarise(new_cons = sum(new_connection)) 
-# 
-# new_con_df %>% 
-#   group_by(week) %>% 
-#   summarise(mean_new_con = mean(new_cons)) %>% 
-#   ggplot(aes(x = week, y=mean_new_con)) + 
-#   geom_line()
-# 
-# model_data <- model_data %>% 
-#   unite(join_id, id, week, remove=FALSE) %>% 
-#   left_join(unite(new_con_df, join_id, id, week)) %>%  
-#   mutate(new_cons = replace_na(new_cons, 0))
-```
 ### Adding transitivity / centrality
 ```{r}
-
-
 trans_df <- week_graphs %>% 
   map_dfr(calc_local_transitivity) %>% 
   left_join(get_participants(week_graphs[[1]]), by="id") %>% 
@@ -495,6 +300,7 @@ trans_df <- week_graphs %>%
 
 model_data %>% 
   left_join(trans_df) %>%  
+  select(-join_id) %>% 
   write_csv("brms_model_data.csv")
 ```
 
@@ -510,8 +316,12 @@ model_data %>%
   geom_histogram()
 ```
 
+# Lost connections
+```{r}
+week_friends %>% 
+  mutate(lost_con = friendship < 0.5 * previous_weight, 
+         lockdown = week %within% first_lockdown | week %within% third_sem) %>% 
+  select(pair_key, friendship, friendship_strength = previous_weight, lost_con, lockdown) %>% 
+  write_csv("distaster_dat.csv")
+```
 
-Funk som man kunne tilføje
-- temporale dynamikker i netværket (e.g. avg. response time)
-  - avg. response time
-- interaktioner?     
