@@ -109,10 +109,13 @@ brm_result_m1 <- brm(
   sample_prior = T,
   cores = 3,
   chains = 4,
-  backend = "cmdstanr", 
+  backend = "cmdstanr",
+  file = "model_1",
   control = list(adapt_delta = 0.99, max_treedepth=20))
 
 ```
+
+
 
 ```{r m2 disaster}
 disaster_dat <- read_csv("disaster_dat.csv") %>% 
@@ -165,6 +168,11 @@ hypothesis(brm_result_m1, "exp(lockdownTRUE) > exp(lockdownFALSE)")
 hypothesis(brm_result_m1, "exp(lockdownTRUE:pagerank) > exp(lockdownFALSE:pagerank)")
 
 hypothesis(brm_result_m1, "exp(lockdownTRUE:trans) > exp(lockdownFALSE:trans)")
+
+hypothesis(brm_result_m1, "(lockdownTRUE:pagerank + lockdownFALSE:pagerank) / 2 = 0")
+
+hypothesis(brm_result_m1, "(lockdownTRUE:trans + lockdownFALSE:trans) / 2 = 0")
+
 
 ```
 

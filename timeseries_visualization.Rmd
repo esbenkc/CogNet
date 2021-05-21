@@ -65,8 +65,23 @@ df_mean_mo <- read_csv("all_node_measures.csv") %>%
     clustering_coef=clustering_coef,
     entropy=scaled_shannon_entropy)
 
-  
+df %>% ungroup() %>% 
+  group_by(name, date) %>% 
+  summarise(degree=sum(centrality_degreein)) %>%
+  arrange(desc(degree)) %>% 
+  ungroup() %>% 
+  summarise(mean(degree),
+            sd(degree))
 ```
+
+```{r}
+df_mean %>%  
+  group_by(date) %>% 
+  summarise(degree=mean(degree)) %>% 
+  ungroup() %>% 
+  summary
+```
+
 
 ```{r}
 df_mean %>% 
