@@ -7,6 +7,7 @@ output: html_document
 
 ```{r packages}
 pacman::p_load(tidyverse, brms, job)
+extrafont::font_import()
 ```
 
 ```{r read data}
@@ -14,7 +15,10 @@ rawdat <- read_csv("brms_model_data.csv")
 ```
 
 ```{r pre-processing}
-rawdat
+
+normalise <- function(x){
+  (x - min(x)) / (max(x)-min(x))
+}
 
 dat <- rawdat %>% 
   subset(select=c(id, lockdown, week, trans, pagerank, new_cons)) %>% 
@@ -68,6 +72,7 @@ brm_result_m0 <- brm(
   sample_prior = T,
   cores = 6,
   chains = 4,
+  file = "model_0",
   backend = "cmdstanr", 
   control = list(adapt_delta = 0.99, max_treedepth=20))
 
@@ -106,6 +111,52 @@ brm_result_m1 <- brm(
   sample_prior = T,
   cores = 3,
   chains = 4,
+  backend = "cmdstanr",
+  file = "model_1",
+  control = list(adapt_delta = 0.99, max_treedepth=20))
+
+```
+
+
+
+```{r m2 disaster}
+disaster_dat <- read_csv("disaster_dat.csv") %>% 
+  drop_na() %>% 
+  mutate(lockdown=as.integer(lockdown),
+         lost_con=as.integer(lost_con))
+
+m2_f <- bf(lost_con ~ 0 + timecol + friendship_strength + friendship_strength:lockdown + (1 + timecol | pair_key))
+
+get_prior(m2_f, data=disaster_dat, family=binomial())
+
+m2_priors <- c(
+  prior(normal(0, 0.15), class=b), 
+  prior(normal(0, 0.3), class=sd),
+  prior(lkj(1), class=cor)
+)
+
+m2_prior_model <- brm(
+  m2_f,
+  disaster_dat,
+  family=binomial(link=logit),
+  prior=m2_priors,
+  sample_prior = "only",
+  cores = 6,
+  chains = 4,
+  backend = "cmdstanr",
+  control = list(adapt_delta = 0.99, max_treedepth=20))
+
+pp_check(m2_prior_model, nsamples=100)
+
+brm_result_m2 <- brm(
+  m2_f,
+  disaster_dat,
+  family=binomial(link=logit),
+  prior=m2_priors,
+  sample_prior = T,
+  cores = 6,
+  threads = threading(2),
+  chains = 4,
   backend = "cmdstanr", 
   control = list(adapt_delta = 0.99, max_treedepth=20))
 
@@ -119,6 +170,11 @@ hypothesis(brm_result_m1, "exp(lockdownTRUE) > exp(lockdownFALSE)")
 hypothesis(brm_result_m1, "exp(lockdownTRUE:pagerank) > exp(lockdownFALSE:pagerank)")
 
 hypothesis(brm_result_m1, "exp(lockdownTRUE:trans) > exp(lockdownFALSE:trans)")
+
+hypothesis(brm_result_m1, "(lockdownTRUE:pagerank + lockdownFALSE:pagerank) / 2 = 0")
+
+hypothesis(brm_result_m1, "(lockdownTRUE:trans + lockdownFALSE:trans) / 2 = 0")
+
 
 ```
 
@@ -175,8 +231,10 @@ brm_result_m1 %>% summary
 
 ```
 
-```{r m0 posterior update plots, fig.width=6, fig.height=4}
-posterior_m0 <- posterior_samples(brm_result_m0)
+```{r m0 posterior update plots, fig.width=6, fig.height=3}
+library(ggplot2)
+brm_result_m0 <- brms::brm(file="model_0")
+posterior_m0 <- brms::posterior_samples(brm_result_m0)
 
 prior_posterior_update <- function(effect_col, subtitle_hyp) {
 ggplot(posterior_m0) +
@@ -187,19 +245,24 @@ ggplot(posterior_m0) +
   labs(subtitle = paste("Posterior update of", subtitle_hyp),
        x="",
        y="") +
-    theme(plot.subtitle = element_text(size=10))
+    theme(plot.subtitle = element_text(size=10),
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank()) +
+    coord_cartesian(xlim=c(-0.65,0.65))
 }
 
 subtitle_hyp <- c("Time", "PageRank", "Clustering")
 cols_of_interest <- c("b_timecol","b_pagerank", "b_trans") 
 
-pl <- map2(cols_of_interest, subtitle_hyp, prior_posterior_update)
+pl <- purrr::map2(cols_of_interest, subtitle_hyp, prior_posterior_update)
 
 gridExtra::grid.arrange(pl[[1]], pl[[2]], pl[[3]], ncol=2)
 ```
 
-```{r m1 posterior update plots, fig.width=6, fig.height=6}
-posterior_m1 <- posterior_samples(brm_result_m1)
+```{r m1 posterior update plots, fig.width=6, fig.height=5.5}
+library(ggplot2)
+brm_result_m1 <- brms::brm(file="model_1")
+posterior_m1 <- brms::posterior_samples(brm_result_m1)
 
 prior_posterior_update <- function(effect_col, subtitle_hyp) {
 ggplot(posterior_m1) +
@@ -209,23 +272,43 @@ ggplot(posterior_m1) +
   theme_minimal()+
   labs(subtitle = paste("Posterior update of", subtitle_hyp),
        x="",
-       y="Density") +
-    theme(plot.subtitle = element_text(size=10))
+       y="") +
+    theme(plot.subtitle = element_text(size=10),
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank()) +
+    coord_cartesian(xlim=c(-0.65,0.65))
 }
 
-subtitle_hyp <- c("Time", "Lockdown", "Lockdown:PageRank", "Open:PageRank", "Lockdown:Clustering", "Open:Clustering")
-cols_of_interest <- c("b_timecol", "b_lockdownTRUE","b_lockdownTRUE:pagerank", "b_lockdownFALSE:pagerank", "b_lockdownTRUE:trans", "b_lockdownFALSE:trans") 
+subtitle_hyp <- c("Time", "Lockdown", "Open", "Lockdown:PageRank", "Open:PageRank", "Lockdown:Clustering", "Open:Clustering")
+cols_of_interest <- c("b_timecol", "b_lockdownTRUE","b_lockdownFALSE","b_lockdownTRUE:pagerank", "b_lockdownFALSE:pagerank", "b_lockdownTRUE:trans", "b_lockdownFALSE:trans") 
 
-pl <- map2(cols_of_interest, subtitle_hyp, prior_posterior_update)
+pl <- purrr::map2(cols_of_interest, subtitle_hyp, prior_posterior_update)
 
-gridExtra::grid.arrange(pl[[1]], pl[[2]], pl[[3]], pl[[4]], pl[[5]], pl[[6]], ncol=2)
+gridExtra::grid.arrange(pl[[1]], pl[[2]], pl[[3]], pl[[4]], pl[[5]], pl[[6]], pl[[7]], ncol=2)
 ```
 
 ```{r mixing plot, fig.width=6}
-cols_of_interest <- c("b_timecol", "b_lockdownTRUE","b_lockdownTRUE:pagerank", "b_lockdownFALSE:pagerank", "b_lockdownTRUE:trans", "b_lockdownFALSE:trans") 
+library(bayesplot, tidyverse, purrr)
+brm_result_m1 <- brms::brm(file="model_1")
+
+names_of_interest <- c("Lockdown", "Lockdown:PageRank", "Open:PageRank", "Time", "Open", "Lockdown:Clustering", "Open:Clustering")
+cols_of_interest <- c("b_lockdownTRUE", "b_lockdownTRUE:pagerank", "b_lockdownFALSE:pagerank","b_timecol", "b_lockdownFALSE", "b_lockdownTRUE:trans", "b_lockdownFALSE:trans") 
 bayes_pos <- as.array(brm_result_m1)
-bayesplot::mcmc_trace(bayes_pos, pars = cols_of_interest) +
-  theme_minimal() +
-  theme(axis.text.x = element_blank())
+
+trace_plots <- function(effect_col, subtitle) {
+  mcmc_trace(bayes_pos, pars=effect_col) +
+    ggplot2::labs(subtitle=subtitle) +
+    ggplot2::theme(legend.position="none",
+          text=ggplot2::element_text(family="Lato"),
+          plot.subtitle = ggplot2::element_text(size=10)) +
+    yaxis_title(FALSE) +
+    xaxis_text(FALSE) +
+    xaxis_ticks(FALSE)
+}
+
+pl <- purrr::map2(cols_of_interest, names_of_interest, trace_plots)
+
+gridExtra::grid.arrange(pl[[1]], pl[[2]], pl[[3]], pl[[4]], pl[[5]], pl[[6]], pl[[7]], ncol=4)
+
 ```
 
