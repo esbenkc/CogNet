@@ -213,21 +213,26 @@ brm_result_m3 <- brm(
 library(brms)
 brm_result_m1 <- brm(file="model_1")
 
-hypothesis(brm_result_m1, "exp(lockdownTRUE) > exp(lockdownFALSE)")[[1]] %>% 
-  rbind(hypothesis(brm_result_m1, "exp(lockdownTRUE:pagerank) > exp(lockdownFALSE:pagerank)")[[1]]) %>% 
-  rbind(hypothesis(brm_result_m1, "exp(lockdownTRUE:trans) > exp(lockdownFALSE:trans)")[[1]]) %>% 
-  rbind(hypothesis(brm_result_m1, "(lockdownTRUE:pagerank + lockdownFALSE:pagerank) / 2 = 0")[[1]]) %>% 
-  rbind(hypothesis(brm_result_m1, "(lockdownTRUE:trans + lockdownFALSE:trans) / 2 = 0")[[1]]) %>% 
-  rbind(hypothesis(brm_result_m1, "lockdownTRUE + lockdownTRUE:pagerank + lockdownTRUE:trans > lockdownFALSE + lockdownFALSE:pagerank + lockdownFALSE:trans")[[1]]) %>% 
+hypotheses <- hypothesis(brm_result_m1, "exp(lockdownTRUE) > exp(lockdownFALSE)")[[1]] %>% 
   rbind(hypothesis(brm_result_m3, "exp(lockdownTRUE) > exp(lockdownFALSE)")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "exp(lockdownTRUE:pagerank) > exp(lockdownFALSE:pagerank)")[[1]]) %>% 
   rbind(hypothesis(brm_result_m3, "exp(lockdownTRUE:pagerank) > exp(lockdownFALSE:pagerank)")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "exp(lockdownTRUE:trans) > exp(lockdownFALSE:trans)")[[1]]) %>% 
   rbind(hypothesis(brm_result_m3, "exp(lockdownTRUE:trans) > exp(lockdownFALSE:trans)")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "(lockdownTRUE:pagerank + lockdownFALSE:pagerank) / 2 = 0")[[1]]) %>% 
   rbind(hypothesis(brm_result_m3, "(lockdownTRUE:pagerank + lockdownFALSE:pagerank) / 2 = 0")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "(lockdownTRUE:trans + lockdownFALSE:trans) / 2 = 0")[[1]]) %>% 
   rbind(hypothesis(brm_result_m3, "(lockdownTRUE:trans + lockdownFALSE:trans) / 2 = 0")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "lockdownTRUE + lockdownTRUE:pagerank + lockdownTRUE:trans > lockdownFALSE + lockdownFALSE:pagerank + lockdownFALSE:trans")[[1]]) %>% 
   rbind(hypothesis(brm_result_m3, "lockdownTRUE + lockdownTRUE:pagerank + lockdownTRUE:trans > lockdownFALSE + lockdownFALSE:pagerank + lockdownFALSE:trans")[[1]]) %>% 
-  cbind(model=c(rep("model_1", 6), rep("model_3",6))) %>% 
-  select(model, Estimate, Evid.Ratio, Hyp=str_trunc(Hypothesis, 10), everything())
+  cbind(model=rep(c("model_1","model_3"), 6)) %>% 
+  mutate(HypTrunc=str_trunc(Hypothesis, 20)) %>% 
+  select(model, Estimate, Evid.Ratio, HypTrunc, everything())
 
+hypotheses  %>% 
+  write_csv("hypothesis_testing.csv")
+
+hypotheses %>% arrange(Hypothesis)
 ```
 
 ```{r hypotheses plotting}
