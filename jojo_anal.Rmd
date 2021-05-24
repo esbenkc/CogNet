@@ -138,4 +138,18 @@ posterior_comparison <- function(posterior, variable = ":trans") {
  
 length(density(c(1,2,1,1))$y)
 ```
+```{r}
+library(dagitty)
+lockdown_dag <- dagitty("dag {
+  lockdown -> pagerank -> new_cons 
+  time ->  new_cons
+  lockdown -> clustering -> new_cons
+  lockdown -> new_cons
+        }
+")
+
+impliedConditionalIndependencies(lockdown_dag)
+dagitty::adjustmentSets(lockdown_dag, exposure = "clustering", outcome = "new_cons")
+
+```
 
