@@ -162,20 +162,77 @@ brm_result_m2 <- brm(
 
 ```
 
+```{r model 3, time-constricted}
+dat_m3 <- rawdat %>% 
+  subset(select=c(id, lockdown, week, trans, pagerank, new_cons)) %>% 
+  drop_na() %>% 
+  mutate(timecol = as.integer(as.factor(week)),
+         pagerank=normalise(pagerank),
+         trans=normalise(trans)) %>% 
+  filter(week > "2020-02-08" & week < "2020-08-06")
+
+m3_f <- bf(new_cons ~ 0 + timecol + lockdown + lockdown:pagerank + lockdown:trans + (1 + timecol | id))
+
+get_prior(m3_f, data=dat_m3, family=negbinomial())
+
+m3_priors <- c(
+  prior(normal(0, 0.1), class=b), 
+  prior(normal(0, 0.1), class=sd), 
+  prior(gamma(0.01, 0.01), class=shape),
+  prior(lkj(1), class=cor)
+)
+ 
+# m0_prior_model_m1 <- brm(
+#   m1_f,
+#   dat,
+#   family=negbinomial(),
+#   prior=m0_priors_m1,
+#   sample_prior = "only",
+#   cores = 6,
+#   chains = 4,
+#   backend = "cmdstanr", 
+#   control = list(adapt_delta = 0.99, max_treedepth=20))
+
+# pp_check(m0_prior_model, nsamples=100)
+
+brm_result_m3 <- brm(
+  m3_f,
+  dat_m3,
+  family=negbinomial(),
+  prior=m3_priors,
+  sample_prior = T,
+  cores = 3,
+  chains = 4,
+  backend = "cmdstanr",
+  file = "model_3",
+  control = list(adapt_delta = 0.99, max_treedepth=20))
+```
+
+
 ```{r hypotheses, fig.width=4}
-summary(brm_result_m1)
+library(brms)
+brm_result_m1 <- brm(file="model_1")
 
-hypothesis(brm_result_m1, "exp(lockdownTRUE) > exp(lockdownFALSE)")
+hypotheses <- hypothesis(brm_result_m1, "exp(lockdownTRUE) > exp(lockdownFALSE)")[[1]] %>% 
+  rbind(hypothesis(brm_result_m3, "exp(lockdownTRUE) > exp(lockdownFALSE)")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "exp(lockdownTRUE:pagerank) > exp(lockdownFALSE:pagerank)")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m3, "exp(lockdownTRUE:pagerank) > exp(lockdownFALSE:pagerank)")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "exp(lockdownTRUE:trans) > exp(lockdownFALSE:trans)")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m3, "exp(lockdownTRUE:trans) > exp(lockdownFALSE:trans)")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "(lockdownTRUE:pagerank + lockdownFALSE:pagerank) / 2 = 0")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m3, "(lockdownTRUE:pagerank + lockdownFALSE:pagerank) / 2 = 0")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "(lockdownTRUE:trans + lockdownFALSE:trans) / 2 = 0")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m3, "(lockdownTRUE:trans + lockdownFALSE:trans) / 2 = 0")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m1, "lockdownTRUE + lockdownTRUE:pagerank + lockdownTRUE:trans > lockdownFALSE + lockdownFALSE:pagerank + lockdownFALSE:trans")[[1]]) %>% 
+  rbind(hypothesis(brm_result_m3, "lockdownTRUE + lockdownTRUE:pagerank + lockdownTRUE:trans > lockdownFALSE + lockdownFALSE:pagerank + lockdownFALSE:trans")[[1]]) %>% 
+  cbind(model=rep(c("model_1","model_3"), 6)) %>% 
+  mutate(HypTrunc=str_trunc(Hypothesis, 20)) %>% 
+  select(model, Estimate, Evid.Ratio, HypTrunc, everything())
 
-hypothesis(brm_result_m1, "exp(lockdownTRUE:pagerank) > exp(lockdownFALSE:pagerank)")
+hypotheses  %>% 
+  write_csv("hypothesis_testing.csv")
 
-hypothesis(brm_result_m1, "exp(lockdownTRUE:trans) > exp(lockdownFALSE:trans)")
-
-hypothesis(brm_result_m1, "(lockdownTRUE:pagerank + lockdownFALSE:pagerank) / 2 = 0")
-
-hypothesis(brm_result_m1, "(lockdownTRUE:trans + lockdownFALSE:trans) / 2 = 0")
-
-
+hypotheses %>% arrange(Hypothesis)
 ```
 
 ```{r hypotheses plotting}
@@ -310,5 +367,9 @@ pl <- purrr::map2(cols_of_interest, names_of_interest, trace_plots)
 
 gridExtra::grid.arrange(pl[[1]], pl[[2]], pl[[3]], pl[[4]], pl[[5]], pl[[6]], pl[[7]], ncol=4)
 
+```
+
+```{r}
+read_csv("brms_model_data.csv")
 ```
 

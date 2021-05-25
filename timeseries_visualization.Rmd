@@ -835,7 +835,7 @@ gridExtra::grid.arrange(p2,p3,p4, ncol=2, heights=c(5,4), layout_matrix=rbind(c(
 ```
 
 ```{r fig.width=4}
-pacman::p_load(ggthemes)
+pacman::p_load(ggthemes, tidyverse)
 
 node_df %>% 
   ggplot() +
@@ -846,7 +846,11 @@ node_df %>%
   labs(y="Count",
        x="New connections") +
   theme_hc()
-
+  
 ```
 
+```{r}
+
+
+```
 
