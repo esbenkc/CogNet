@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# COGNET
+# 🕸 COGNET
 
 **Authors:** [Esben Kran](https://kran.ai) & [Jonathan Hvithamar
 Rystrøm](https://linkedin.com/in/jonathan-rystroem) <br/>
